@@ -38,8 +38,6 @@ build:
     - docker push $CI_REGISTRY_IMAGE/backend:latest
   only:
     - main
-  tags:
-    - docker
 
 # Deploy to VM (manual trigger)
 deploy:
