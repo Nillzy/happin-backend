@@ -2,9 +2,6 @@
 # Stage 1: Build dependencies
 FROM python:3.11-slim as builder
 
-# Force cache bust
-ARG CACHEBUST=1
-
 WORKDIR /app
 
 # Install system dependencies

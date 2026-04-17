@@ -30,7 +30,7 @@ build:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     # Build once with commit SHA tag
-    - docker build --no-cache -t $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA .
+    - docker build -t $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA .
     # Tag as latest (no rebuild!)
     - docker tag $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA $CI_REGISTRY_IMAGE/backend:latest
     # Push both tags
@@ -51,7 +51,7 @@ deploy:
     - chmod 700 ~/.ssh
     - ssh-keyscan -H vm552.ipp-vps.net >> ~/.ssh/known_hosts
   script:
-    - ssh happin-deploy@vm552.ipp-vps.net "cd /home/shared/deployment && docker compose pull backend && docker compose up -d backend"
+    - ssh happin-deploy@vm552.ipp-vps.net "cd /home/shared/deployment/backend && git pull origin main && cd /home/shared/deployment && docker compose pull backend && docker compose up -d backend"
   only:
     - main
   environment:
