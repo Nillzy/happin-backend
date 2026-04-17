@@ -23,9 +23,9 @@ variables:
 # Build Docker image and push to GitLab Container Registry
 build:
   stage: build
-  image: docker:27-cli-alpine3.20
+  image: docker:latest
   services:
-    - docker:27-dind-alpine3.20
+    - docker:dind
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
