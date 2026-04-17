@@ -1,2 +1,3 @@
 # Backend Dependencies
-# Will be filled when implementation starts
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
