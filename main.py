@@ -5,7 +5,7 @@ app = FastAPI()
 
 @app.get("/")
 def root():
-    return {"message": "Backend läuft!"}
+    return {"message": "Happin Backend v1.0 - Deployment Test erfolgreich!"}
 
 
 @app.get("/health")
