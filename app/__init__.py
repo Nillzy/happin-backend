@@ -1,0 +1,1 @@
+"""Happin Backend Application."""
