@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # Supabase Configuration
     SUPABASE_URL: str
-    SUPABASE_KEY: str
+    SUPABASE_ANON_KEY: str
     SUPABASE_JWT_SECRET: str | None = None
     DATABASE_URL: str | None = None
 

@@ -4,7 +4,8 @@ uvicorn[standard]==0.27.0
 pydantic-settings==2.1.0
 
 # Database & Auth
-supabase==2.3.0
+supabase==2.10.0
+websockets>=13.0,<16
 
 # External APIs (optional - install as needed)
 # stripe==7.0.0

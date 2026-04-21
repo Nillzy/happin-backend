@@ -1,14 +1,14 @@
 """Authentication middleware and dependencies."""
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
+from fastapi.security import HTTPBearer
 from app.core.supabase import supabase
 
 # HTTP Bearer token scheme
 security = HTTPBearer()
 
 
-async def get_current_user(credentials: HTTPAuthCredentials = Depends(security)):
+async def get_current_user(credentials = Depends(security)):
     """
     Validate JWT token and return current user.
 
@@ -47,9 +47,7 @@ async def get_current_user(credentials: HTTPAuthCredentials = Depends(security))
         )
 
 
-async def get_current_user_optional(
-    credentials: HTTPAuthCredentials | None = Depends(HTTPBearer(auto_error=False))
-):
+async def get_current_user_optional(credentials = Depends(HTTPBearer(auto_error=False))):
     """
     Optional authentication - returns user if authenticated, None otherwise.
 
