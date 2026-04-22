@@ -55,6 +55,10 @@ FastAPI Backend für die Happin Event-Discovery Plattform.
 
 ---
 
+## Maintainer-Dokumentation
+
+Ausführliche, **reine Markdown**-Dokumentation für Maintainer liegt unter **`documentation/`** (Einstieg: `documentation/00-index.md`). Sie ist **nicht** in die Laufzeit-App eingebunden und dient Lesen im Editor oder auf GitLab. Details zu Aufbau und Pflege stehen im Index.
+
 ## Projektstruktur
 
 ```
@@ -73,6 +77,7 @@ backend/
 │   ├── utils/                   # Helper Functions
 │   └── main.py                  # FastAPI App Entry Point
 │
+├── documentation/               # Maintainer-Doku (Markdown, siehe 00-index.md)
 ├── tests/                       # Tests
 ├── .env.example                 # Environment Template
 ├── requirements.txt             # Dependencies
