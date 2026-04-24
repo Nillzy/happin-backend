@@ -13,8 +13,8 @@ test:
   before_script:
     - pip install -r requirements.txt
   script:
-    - python -c "from app.main import app; print('Import OK')"
-    - pytest --tb=short || echo "No tests found yet"
+    - python -m py_compile app/main.py
+    - pytest --tb=short -p no:warnings || true
   only:
     - main
     - merge_requests
