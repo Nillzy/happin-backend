@@ -10,6 +10,7 @@ FastAPI Backend für die Happin Event-Discovery Plattform.
 
 - Python 3.11 oder höher
 - pip
+- Optional für **Supabase CLI** (`login`, `link`, Migrationen): siehe **`documentation/06-local-development-and-docker.md`** (Installation und Einrichtung für das Team-Projekt)
 
 ### Installation
 
