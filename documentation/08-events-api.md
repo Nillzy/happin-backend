@@ -26,7 +26,8 @@ Dieses Dokument beschreibt die Events-API, die Architektur-Entscheidungen dahint
     {
       "event_id": 1,
       "title": "Techno Night Berlin",
-      "date": "2026-05-10T22:00:00",
+      "starts_at": "2026-05-10T22:00:00+00:00",
+      "ends_at": null,
       "description": "...",
       "category": "Musik",
       "max_capacity": 500,
@@ -98,7 +99,7 @@ Wenn ein neuer Endpoint z.B. Tickets laden muss:
 
 ```python
 supabase.table("ticket").select(
-    "*, participation(*, event_participation(*, event(*)))"
+    "*, event_participation(*, event(*))"
 )
 ```
 
@@ -117,7 +118,6 @@ Die verschachtelte Syntax folgt dem Foreign-Key-Pfad.
 
 | Feature | Status | Workaround |
 |---------|--------|-----------|
-| End-Zeitpunkt | Nur ein `date`-Feld vorhanden | UI zeigt nur Startzeit |
 | Preis auf Event-Ebene | Preis nur auf `ticket`-Tabelle | Frontend zeigt "Preis auf Anfrage" |
 | Lineup/Programm | Keine DB-Repräsentation | Abschnitt wird ausgeblendet wenn leer |
 | Event-Titelbild | Kein dediziertes Feld | Erste URL aus `event_media` wird verwendet |

@@ -14,6 +14,8 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [06-local-development-and-docker.md](06-local-development-and-docker.md) | Lokales Setup, Uvicorn, Docker-Image |
 | [07-ci-cd-and-deployment.md](07-ci-cd-and-deployment.md) | GitLab CI, Registry, manuelles Deploy |
 | [08-events-api.md](08-events-api.md) | Events-API: Endpoints, Architektur-Entscheidungen, Supabase-Query-Muster, Schema-Mapping |
+| [09-event-creation.md](09-event-creation.md) | Event-Erstellung: DB-Migration, Person-Service, Erstellungs-Flow, POST-Endpoint, Validierung |
+| [10-schema-optimization.md](10-schema-optimization.md) | Schema-Optimierung: participation-Merge, event_media PK, timestamptz, starts_at/ends_at, RLS-Policies |
 
 ## Neue Dokumentation hinzufügen
 
