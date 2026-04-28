@@ -1,11 +1,16 @@
-"""Event endpoints for listing and viewing public events."""
+"""Event endpoints for listing, viewing, and creating events."""
+
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from app.core.auth import get_current_user_optional
-from app.schemas.events import EventListItem, EventListResponse, EventDetailResponse
+from fastapi.security import HTTPBearer
+from app.core.auth import get_current_user, get_current_user_optional
+from app.schemas.events import EventCreate, EventListItem, EventListResponse, EventDetailResponse
 from app.services import event_service
+from app.services import person_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _to_list_item(raw: dict) -> EventListItem:
@@ -18,7 +23,8 @@ def _to_list_item(raw: dict) -> EventListItem:
     return EventListItem(
         event_id=raw["event_id"],
         title=raw["title"],
-        date=raw["date"],
+        starts_at=raw["starts_at"],
+        ends_at=raw.get("ends_at"),
         description=raw.get("description"),
         category=raw.get("category"),
         max_capacity=raw.get("max_capacity"),
@@ -40,15 +46,7 @@ async def list_public_events(
     return EventListResponse(events=events, count=len(events))
 
 
-@router.get("/{event_id}", response_model=EventDetailResponse)
-async def get_event_detail(
-    event_id: int,
-    user=Depends(get_current_user_optional),
-):
-    raw = event_service.get_event_by_id(event_id)
-    if not raw:
-        raise HTTPException(status_code=404, detail="Event not found")
-
+def _to_detail(raw: dict) -> EventDetailResponse:
     media = raw.get("event_media") or []
     media_urls = [m["media_url"] for m in media]
     image_url = media_urls[0] if media_urls else None
@@ -69,7 +67,8 @@ async def get_event_detail(
     return EventDetailResponse(
         event_id=raw["event_id"],
         title=raw["title"],
-        date=raw["date"],
+        starts_at=raw["starts_at"],
+        ends_at=raw.get("ends_at"),
         description=raw.get("description"),
         category=raw.get("category"),
         max_capacity=raw.get("max_capacity"),
@@ -83,3 +82,41 @@ async def get_event_detail(
         host_name=host_name,
         media_urls=media_urls,
     )
+
+
+@router.get("/{event_id}", response_model=EventDetailResponse)
+async def get_event_detail(
+    event_id: int,
+    user=Depends(get_current_user_optional),
+):
+    raw = event_service.get_event_by_id(event_id)
+    if not raw:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    return _to_detail(raw)
+
+
+@router.post("/", response_model=EventDetailResponse, status_code=201)
+async def create_event(
+    body: EventCreate,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    try:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        person_id = person["person_id"]
+
+        raw = event_service.create_event(body.model_dump(), person_id, credentials.credentials)
+        if not raw:
+            raise HTTPException(status_code=500, detail="Event creation failed")
+
+        return _to_detail(raw)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Event creation error")
+        raise HTTPException(status_code=500, detail=str(e))

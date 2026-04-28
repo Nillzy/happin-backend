@@ -1,19 +1,20 @@
 """Tests for /api/v1/events/ endpoints."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 
 MOCK_EVENT_RAW = {
     "event_id": 1,
     "title": "Techno Night Berlin",
-    "date": "2026-05-10T22:00:00",
+    "starts_at": "2026-05-10T22:00:00+00:00",
+    "ends_at": None,
     "description": "Eine legendäre Nacht.",
     "category": "Musik",
     "max_capacity": 500,
     "is_public": True,
     "invitation_link": "https://happin.app/invite/abc123",
-    "created_at": "2026-04-20T10:00:00",
-    "updated_at": "2026-04-20T10:00:00",
+    "created_at": "2026-04-20T10:00:00+00:00",
+    "updated_at": "2026-04-20T10:00:00+00:00",
     "location": {
         "location_id": 1,
         "city": "Berlin",
@@ -69,6 +70,7 @@ def test_list_events_returns_data(client, mock_supabase):
     event = body["events"][0]
     assert event["event_id"] == 1
     assert event["title"] == "Techno Night Berlin"
+    assert "starts_at" in event
     assert event["image_url"] == "https://example.com/image1.jpg"
     assert event["participant_count"] == 2
     assert event["location"]["city"] == "Berlin"
@@ -83,9 +85,100 @@ def test_get_event_detail_found(client, mock_supabase):
     assert body["host_name"] == "Max Mustermann"
     assert len(body["media_urls"]) == 2
     assert body["invitation_link"] == "https://happin.app/invite/abc123"
+    assert "starts_at" in body
+    assert body["ends_at"] is None
 
 
 def test_get_event_detail_not_found(client, mock_supabase):
     _mock_chain(mock_supabase, [])
     response = client.get("/api/v1/events/999")
     assert response.status_code == 404
+
+
+def test_create_event_unauthorized(client, mock_supabase):
+    response = client.post("/api/v1/events/", json={
+        "title": "Test Event",
+        "starts_at": "2026-12-01T18:00:00",
+        "is_public": True,
+        "location": {"city": "Berlin"},
+    })
+    assert response.status_code in (401, 403)
+
+
+def test_create_event_validation_error(client, mock_supabase):
+    mock_supabase.auth.get_user.return_value = MagicMock(
+        user=MagicMock(id="uid-123", email="test@example.com")
+    )
+    response = client.post(
+        "/api/v1/events/",
+        json={"is_public": True},
+        headers={"Authorization": "Bearer fake-token"},
+    )
+    assert response.status_code == 422
+
+
+def test_create_event_success(client, mock_supabase):
+    mock_supabase.auth.get_user.return_value = MagicMock(
+        user=MagicMock(id="uid-123", email="test@example.com")
+    )
+
+    person_chain = MagicMock()
+    person_chain.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = {
+        "person_id": 10,
+        "supabase_user_id": "uid-123",
+        "email_address": "test@example.com",
+        "first_name": "test",
+    }
+
+    location_insert = MagicMock()
+    location_insert.insert.return_value.execute.return_value.data = [{"location_id": 5}]
+
+    event_insert = MagicMock()
+    event_insert.insert.return_value.execute.return_value.data = [{"event_id": 42}]
+
+    participation_insert = MagicMock()
+    participation_insert.insert.return_value.execute.return_value.data = [
+        {"event_participation_id": 7}
+    ]
+
+    created_event_raw = {
+        **MOCK_EVENT_RAW,
+        "event_id": 42,
+        "title": "Neues Event",
+    }
+    event_select = MagicMock()
+    event_select.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = created_event_raw
+
+    call_count = 0
+
+    def table_side_effect(name):
+        nonlocal call_count
+        idx = call_count
+        call_count += 1
+        if name == "person":
+            return person_chain
+        if name == "location":
+            return location_insert
+        if name == "event" and idx <= 2:
+            return event_insert
+        if name == "event_participation":
+            return participation_insert
+        return event_select
+
+    mock_supabase.table.side_effect = table_side_effect
+
+    response = client.post(
+        "/api/v1/events/",
+        json={
+            "title": "Neues Event",
+            "starts_at": "2026-12-01T18:00:00",
+            "is_public": True,
+            "description": "Test",
+            "location": {"city": "Berlin"},
+        },
+        headers={"Authorization": "Bearer fake-token"},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["event_id"] == 42
+    assert body["title"] == "Neues Event"

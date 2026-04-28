@@ -17,6 +17,7 @@ Lokal typischerweise `http://localhost:8001` (siehe README / Uvicorn-Port).
 | Methode | Pfad | Auth | Zweck |
 |---------|------|------|--------|
 | GET | `/api/v1/user/me` | Bearer JWT | Gibt Daten des angemeldeten Nutzers zurück (Beispiel/Profil-Test); Response-Schema: `UserResponse` |
+| POST | `/api/v1/events/` | Bearer JWT | Neues Event erstellen; Request-Schema: `EventCreate`, Response-Schema: `EventDetailResponse` (201); Details: [09-event-creation.md](09-event-creation.md) |
 
 ## Öffentliche Endpoints mit optionaler Auth
 

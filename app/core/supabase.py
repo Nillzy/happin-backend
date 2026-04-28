@@ -1,6 +1,7 @@
 """Supabase client initialization."""
 
 from supabase import create_client, Client
+from supabase.lib.client_options import SyncClientOptions as ClientOptions
 from app.core.config import settings
 
 # Lazy initialization - only create client when accessed
@@ -9,9 +10,9 @@ _supabase_client: Client | None = None
 
 def get_supabase() -> Client:
     """
-    Get or create Supabase client.
+    Get or create the default Supabase client (anon key).
 
-    Lazy initialization prevents crashes on startup if Supabase is not available.
+    Used for read-only public queries (GET endpoints).
     """
     global _supabase_client
     if _supabase_client is None:
@@ -20,6 +21,22 @@ def get_supabase() -> Client:
             supabase_key=settings.SUPABASE_ANON_KEY
         )
     return _supabase_client
+
+
+def get_supabase_for_user(token: str) -> Client:
+    """
+    Create a Supabase client authenticated as a specific user.
+
+    The user's JWT is set as the Authorization header, so PostgREST
+    applies RLS policies for the 'authenticated' role.
+    """
+    return create_client(
+        supabase_url=settings.SUPABASE_URL,
+        supabase_key=settings.SUPABASE_ANON_KEY,
+        options=ClientOptions(
+            headers={"Authorization": f"Bearer {token}"}
+        )
+    )
 
 
 # For backwards compatibility
