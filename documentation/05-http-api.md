@@ -18,6 +18,15 @@ Lokal typischerweise `http://localhost:8001` (siehe README / Uvicorn-Port).
 |---------|------|------|--------|
 | GET | `/api/v1/user/me` | Bearer JWT | Gibt Daten des angemeldeten Nutzers zurück (Beispiel/Profil-Test); Response-Schema: `UserResponse` |
 
+## Öffentliche Endpoints mit optionaler Auth
+
+| Methode | Pfad | Auth | Zweck |
+|---------|------|------|--------|
+| GET | `/api/v1/events/` | Optional Bearer JWT | Öffentliche Events chronologisch auflisten; Query-Params: `limit` (1–100, default 50), `offset` (≥ 0, default 0); Response-Schema: `EventListResponse` |
+| GET | `/api/v1/events/{event_id}` | Optional Bearer JWT | Einzelnes Event mit vollem Detail (Location, Media, Host); Response-Schema: `EventDetailResponse`; 404 wenn nicht gefunden |
+
+Details zu den Event-Endpoints, Architektur-Entscheidungen und Supabase-Query-Mustern: siehe [08-events-api.md](08-events-api.md).
+
 ## OpenAPI / Swagger
 
 Bei **`DEBUG=true`** stehen **`/docs`** (Swagger UI) und **`/redoc`** zur Verfügung. In Produktion sollte `DEBUG` aus bleiben, damit die interaktive Doku nicht öffentlich exponiert ist.

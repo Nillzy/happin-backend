@@ -13,6 +13,7 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [05-http-api.md](05-http-api.md) | Öffentliche und geschützte Endpoints, API-Versionierung |
 | [06-local-development-and-docker.md](06-local-development-and-docker.md) | Lokales Setup, Uvicorn, Docker-Image |
 | [07-ci-cd-and-deployment.md](07-ci-cd-and-deployment.md) | GitLab CI, Registry, manuelles Deploy |
+| [08-events-api.md](08-events-api.md) | Events-API: Endpoints, Architektur-Entscheidungen, Supabase-Query-Muster, Schema-Mapping |
 
 ## Neue Dokumentation hinzufügen
 
