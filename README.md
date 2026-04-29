@@ -180,7 +180,7 @@ Vorlage liegt in `.env.example`. Die Datei `.env` wird **nicht** ins Git committ
 |----------|---------|--------------|
 | `SUPABASE_URL` | Ja | URL der Supabase-Instanz (lokal: `http://localhost:8000`) |
 | `SUPABASE_ANON_KEY` | Ja | Öffentlicher Anon-Key des Supabase-Projekts |
-| `SUPABASE_JWT_SECRET` | Ja | JWT-Secret für lokale Token-Validierung |
+| `SUPABASE_JWT_SECRET` | Nein | Nicht mehr in Verwendung — Auth läuft über `supabase.auth.get_user(token)` |
 | `DATABASE_URL` | Nein | PostgreSQL-Connection-String (Supabase-Client wird bevorzugt) |
 | `DEBUG` | Nein | `true` aktiviert Swagger UI und detaillierte Fehlermeldungen (Standard: `false`) |
 | `LOG_LEVEL` | Nein | Log-Verbosity: `debug`, `info`, `warning`, `error` (Standard: `info`) |
@@ -214,6 +214,8 @@ Alle stabilen Routen liegen unter dem Präfix `/api/v1`.
 |---------|------|--------------|
 | GET | `/api/v1/user/me` | Profil des angemeldeten Nutzers (`UserResponse`) |
 | POST | `/api/v1/events/` | Neues Event erstellen (`EventCreate` → `EventDetailResponse`, Status 201) |
+| PATCH | `/api/v1/events/{event_id}` | Event aktualisieren (nur Host); Partial-Update inkl. Status-Wechsel |
+| PUT | `/api/v1/events/{event_id}/ticket-options` | Ticket-Optionen synchronisieren (UPSERT, nur Host) |
 
 Vollständige Schnittstellenbeschreibung: `documentation/05-http-api.md`.
 
