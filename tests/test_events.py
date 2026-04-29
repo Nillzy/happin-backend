@@ -12,6 +12,8 @@ MOCK_EVENT_RAW = {
     "category": "Musik",
     "max_capacity": 500,
     "is_public": True,
+    "is_free": True,
+    "status": "published",
     "invitation_link": "https://happin.app/invite/abc123",
     "created_at": "2026-04-20T10:00:00+00:00",
     "updated_at": "2026-04-20T10:00:00+00:00",
@@ -40,13 +42,16 @@ MOCK_EVENT_RAW = {
             "person": {"first_name": "Anna", "last_name": "Schmidt"},
         },
     ],
+    "ticket_option": [],
 }
 
 
 def _mock_chain(mock_supabase, data):
     """Set up the chained Supabase query mock to return given data."""
     chain = mock_supabase.table.return_value.select.return_value
-    chain.eq.return_value.order.return_value.range.return_value.execute.return_value.data = data
+    # get_public_events: .eq("is_public").eq("status").order().range().execute()
+    chain.eq.return_value.eq.return_value.order.return_value.range.return_value.execute.return_value.data = data
+    # get_event_by_id: .eq("event_id").maybe_single().execute()
     chain.eq.return_value.maybe_single.return_value.execute.return_value.data = (
         data[0] if data else None
     )
