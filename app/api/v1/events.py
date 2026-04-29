@@ -86,7 +86,7 @@ def _to_detail(raw: dict) -> EventDetailResponse:
 
 @router.get("/{event_id}", response_model=EventDetailResponse)
 async def get_event_detail(
-    event_id: int,
+    event_id: str,
     user=Depends(get_current_user_optional),
 ):
     raw = event_service.get_event_by_id(event_id)

@@ -27,7 +27,7 @@ def get_public_events(limit: int = 50, offset: int = 0) -> list[dict]:
     return response.data
 
 
-def get_event_by_id(event_id: int) -> dict | None:
+def get_event_by_id(event_id: str) -> dict | None:
     supabase = get_supabase()
 
     response = (
@@ -44,7 +44,7 @@ def get_event_by_id(event_id: int) -> dict | None:
     return response.data if response else None
 
 
-def create_event(data: dict, person_id: int, token: str) -> dict:
+def create_event(data: dict, person_id: str, token: str) -> dict:
     supabase = get_supabase_for_user(token)
 
     location_data = data.pop("location")
