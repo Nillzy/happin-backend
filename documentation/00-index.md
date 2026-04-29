@@ -16,6 +16,8 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [08-events-api.md](08-events-api.md) | Events-API: Endpoints, Architektur-Entscheidungen, Supabase-Query-Muster, Schema-Mapping |
 | [09-event-creation.md](09-event-creation.md) | Event-Erstellung: DB-Migration, Person-Service, Erstellungs-Flow, POST-Endpoint, Validierung |
 | [10-schema-optimization.md](10-schema-optimization.md) | Schema-Optimierung: participation-Merge, event_media PK, timestamptz, starts_at/ends_at, RLS-Policies |
+| [11-event-draft-status.md](11-event-draft-status.md) | Event Draft-Status: DB-Migration, Access Control für Entwürfe, Veröffentlichungs-Flow, Sicherheitsmodell |
+| [12-ticket-options.md](12-ticket-options.md) | Ticket-Optionen: Preiskategorien, ticket_option-Tabelle, RLS, UPSERT-Endpoint, is_free-Logik |
 
 ## Neue Dokumentation hinzufügen
 

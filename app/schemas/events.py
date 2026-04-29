@@ -2,10 +2,11 @@
 
 from pydantic import BaseModel, field_validator
 from datetime import datetime
+from app.schemas.ticket_options import TicketOptionResponse
 
 
 class LocationCreate(BaseModel):
-    city: str
+    city: str | None = None
     street: str | None = None
     house_number: str | None = None
     postal_code: str | None = None
@@ -15,10 +16,12 @@ class LocationCreate(BaseModel):
 
     @field_validator("city")
     @classmethod
-    def city_not_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("city must not be empty")
-        return v.strip()
+    def city_not_empty(cls, v: str | None) -> str | None:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                return None
+        return v
 
 
 class EventCreate(BaseModel):
@@ -29,7 +32,9 @@ class EventCreate(BaseModel):
     category: str | None = None
     max_capacity: int | None = None
     is_public: bool
+    is_free: bool = True
     location: LocationCreate
+    status: str = "published"
 
     @field_validator("title")
     @classmethod
@@ -55,6 +60,59 @@ class EventCreate(BaseModel):
             raise ValueError("max_capacity must be greater than 0")
         return v
 
+    @field_validator("status")
+    @classmethod
+    def status_valid(cls, v: str) -> str:
+        if v not in ("draft", "published"):
+            raise ValueError("status must be 'draft' or 'published'")
+        return v
+
+
+class LocationUpdate(BaseModel):
+    city: str | None = None
+    street: str | None = None
+    house_number: str | None = None
+    postal_code: str | None = None
+    country: str | None = None
+
+
+class EventUpdate(BaseModel):
+    title: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    description: str | None = None
+    category: str | None = None
+    max_capacity: int | None = None
+    is_public: bool | None = None
+    is_free: bool | None = None
+    status: str | None = None
+    location: LocationUpdate | None = None
+
+    @field_validator("title")
+    @classmethod
+    def title_not_empty(cls, v: str | None) -> str | None:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                raise ValueError("title must not be empty")
+            if len(v) > 255:
+                raise ValueError("title must be at most 255 characters")
+        return v
+
+    @field_validator("max_capacity")
+    @classmethod
+    def capacity_positive(cls, v: int | None) -> int | None:
+        if v is not None and v <= 0:
+            raise ValueError("max_capacity must be greater than 0")
+        return v
+
+    @field_validator("status")
+    @classmethod
+    def status_valid(cls, v: str | None) -> str | None:
+        if v is not None and v not in ("draft", "published"):
+            raise ValueError("status must be 'draft' or 'published'")
+        return v
+
 
 class LocationResponse(BaseModel):
     location_id: str
@@ -78,6 +136,8 @@ class EventListItem(BaseModel):
     category: str | None = None
     max_capacity: int | None = None
     is_public: bool
+    is_free: bool = True
+    status: str = "published"
     image_url: str | None = None
     location: LocationResponse | None = None
     participant_count: int = 0
@@ -97,3 +157,4 @@ class EventDetailResponse(EventListItem):
     updated_at: datetime | None = None
     host_name: str | None = None
     media_urls: list[str] = []
+    ticket_options: list[TicketOptionResponse] = []
