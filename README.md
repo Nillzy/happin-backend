@@ -53,8 +53,8 @@ REST-API der **Happin Event-Discovery-Plattform**, gebaut mit FastAPI und Python
 │  (Phone OTP, JWT)  │   │    FastAPI  ·  Port 8001       │
 └────────────────────┘   │                                │
           │              │  ┌──────────────────────────┐  │
-          │ JWT           │  │  app/core/auth.py        │  │
-          └──────────────►│  │  supabase.auth.get_user  │  │
+          │ JWT          │  │  app/core/auth.py        │  │
+          └─────────────►│  │  supabase.auth.get_user  │  │
                          │  └──────────────────────────┘  │
                          │                                │
                          │  ┌──────────────────────────┐  │
@@ -65,8 +65,8 @@ REST-API der **Happin Event-Discovery-Plattform**, gebaut mit FastAPI und Python
                                          │
                                          ▼
                               ┌──────────────────────┐
-                              │  Supabase (Postgres)  │
-                              │  Projekt: HappinDB    │
+                              │  Supabase (Postgres) │
+                              │  Projekt: HappinDB   │
                               └──────────────────────┘
 ```
 
