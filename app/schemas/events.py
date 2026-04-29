@@ -57,7 +57,7 @@ class EventCreate(BaseModel):
 
 
 class LocationResponse(BaseModel):
-    location_id: int
+    location_id: str
     city: str
     street: str | None = None
     house_number: str | None = None
@@ -70,7 +70,7 @@ class LocationResponse(BaseModel):
 
 
 class EventListItem(BaseModel):
-    event_id: int
+    event_id: str
     title: str
     starts_at: datetime
     ends_at: datetime | None = None
