@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 
 MOCK_EVENT_RAW = {
-    "event_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "event_id": "35b43254-4e21-459f-b729-4cb3966cf322",
     "title": "Techno Night Berlin",
     "starts_at": "2026-05-10T22:00:00+00:00",
     "ends_at": None,
@@ -18,7 +18,7 @@ MOCK_EVENT_RAW = {
     "created_at": "2026-04-20T10:00:00+00:00",
     "updated_at": "2026-04-20T10:00:00+00:00",
     "location": {
-        "location_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "location_id": "8fa1205a-aca8-4243-8169-b5af4fd27833",
         "city": "Berlin",
         "street": "Revaler Str.",
         "house_number": "99",
@@ -32,12 +32,12 @@ MOCK_EVENT_RAW = {
     ],
     "event_participation": [
         {
-            "event_participation_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+            "event_participation_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
             "role": "Host",
             "person": {"first_name": "Max", "last_name": "Mustermann"},
         },
         {
-            "event_participation_id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+            "event_participation_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
             "role": "Participant",
             "person": {"first_name": "Anna", "last_name": "Schmidt"},
         },
@@ -73,7 +73,7 @@ def test_list_events_returns_data(client, mock_supabase):
     body = response.json()
     assert body["count"] == 1
     event = body["events"][0]
-    assert event["event_id"] == "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    assert event["event_id"] == "35b43254-4e21-459f-b729-4cb3966cf322"
     assert event["title"] == "Techno Night Berlin"
     assert "starts_at" in event
     assert event["image_url"] == "https://example.com/image1.jpg"
@@ -83,10 +83,10 @@ def test_list_events_returns_data(client, mock_supabase):
 
 def test_get_event_detail_found(client, mock_supabase):
     _mock_chain(mock_supabase, [MOCK_EVENT_RAW])
-    response = client.get("/api/v1/events/a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+    response = client.get("/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322")
     assert response.status_code == 200
     body = response.json()
-    assert body["event_id"] == "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    assert body["event_id"] == "35b43254-4e21-459f-b729-4cb3966cf322"
     assert body["host_name"] == "Max Mustermann"
     assert len(body["media_urls"]) == 2
     assert body["invitation_link"] == "https://happin.app/invite/abc123"
@@ -96,7 +96,7 @@ def test_get_event_detail_found(client, mock_supabase):
 
 def test_get_event_detail_not_found(client, mock_supabase):
     _mock_chain(mock_supabase, [])
-    response = client.get("/api/v1/events/00000000-0000-0000-0000-000000000999")
+    response = client.get("/api/v1/events/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
 
 
@@ -129,26 +129,26 @@ def test_create_event_success(client, mock_supabase):
 
     person_chain = MagicMock()
     person_chain.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = {
-        "person_id": "e5f6a7b8-c9d0-1234-5678-abcdef123456",
+        "person_id": "c1d2e3f4-a5b6-7890-cdef-123456789012",
         "supabase_user_id": "uid-123",
         "email_address": "test@example.com",
         "first_name": "test",
     }
 
     location_insert = MagicMock()
-    location_insert.insert.return_value.execute.return_value.data = [{"location_id": "f6a7b8c9-d0e1-2345-6789-abcdef234567"}]
+    location_insert.insert.return_value.execute.return_value.data = [{"location_id": "d2e3f4a5-b6c7-8901-def0-234567890123"}]
 
     event_insert = MagicMock()
-    event_insert.insert.return_value.execute.return_value.data = [{"event_id": "a7b8c9d0-e1f2-3456-7890-abcdef345678"}]
+    event_insert.insert.return_value.execute.return_value.data = [{"event_id": "e3f4a5b6-c7d8-9012-ef01-345678901234"}]
 
     participation_insert = MagicMock()
     participation_insert.insert.return_value.execute.return_value.data = [
-        {"event_participation_id": "b8c9d0e1-f2a3-4567-8901-abcdef456789"}
+        {"event_participation_id": "f4a5b6c7-d8e9-0123-f012-456789012345"}
     ]
 
     created_event_raw = {
         **MOCK_EVENT_RAW,
-        "event_id": "a7b8c9d0-e1f2-3456-7890-abcdef345678",
+        "event_id": "e3f4a5b6-c7d8-9012-ef01-345678901234",
         "title": "Neues Event",
     }
     event_select = MagicMock()
@@ -185,5 +185,5 @@ def test_create_event_success(client, mock_supabase):
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["event_id"] == "a7b8c9d0-e1f2-3456-7890-abcdef345678"
+    assert body["event_id"] == "e3f4a5b6-c7d8-9012-ef01-345678901234"
     assert body["title"] == "Neues Event"
