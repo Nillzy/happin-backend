@@ -3,15 +3,25 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.auth import get_current_user, get_current_user_optional
 from app.schemas.events import EventCreate, EventUpdate, EventListItem, EventListResponse, EventDetailResponse
 from app.schemas.ticket_options import TicketOptionResponse
+from app.schemas.participants import (
+    ParticipantListResponse,
+    ParticipantResponse,
+    PersonInfo,
+    ParticipantCounts,
+    RemoveParticipantsRequest,
+    RemoveParticipantsResponse,
+)
 from app.services import event_service
 from app.services import person_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+optional_bearer = HTTPBearer(auto_error=False)
 
 
 def _to_list_item(raw: dict) -> EventListItem:
@@ -35,6 +45,7 @@ def _to_list_item(raw: dict) -> EventListItem:
         image_url=image_url,
         location=raw.get("location"),
         participant_count=participant_count,
+        is_host=raw.get("is_host", False),
     )
 
 
@@ -43,8 +54,19 @@ async def list_public_events(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user=Depends(get_current_user_optional),
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
 ):
-    raw_events = event_service.get_public_events(limit=limit, offset=offset)
+    """List all public events with pagination."""
+    person_id = None
+    if user and credentials:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        person_id = person["person_id"]
+
+    raw_events = event_service.get_public_events(limit=limit, offset=offset, person_id=person_id)
     events = [_to_list_item(e) for e in raw_events]
     return EventListResponse(events=events, count=len(events))
 
@@ -172,3 +194,80 @@ async def update_event_endpoint(
     except Exception as e:
         logger.exception("Event update error")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{event_id}/participants", response_model=ParticipantListResponse)
+async def get_participants(
+    event_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Get all participants for an event. Only accessible by the host."""
+    # Check event exists first
+    event = event_service.get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=credentials.credentials,
+    )
+    person_id = person["person_id"]
+
+    if not event_service.is_user_host(event_id=event_id, person_id=person_id):
+        raise HTTPException(status_code=403, detail="Only the host can view participants")
+
+    data = event_service.get_event_participants(event_id=event_id)
+
+    participants = [
+        ParticipantResponse(
+            participation_id=p["event_participation_id"],
+            person=PersonInfo(
+                person_id=p["person"]["person_id"],
+                first_name=p["person"]["first_name"],
+                last_name=p["person"].get("last_name"),
+                phone_number=p["person"].get("phone_number"),
+            ),
+            status=p["status"],
+            created_at=p.get("created_at"),
+        )
+        for p in data["participants"]
+    ]
+
+    return ParticipantListResponse(
+        participants=participants,
+        counts=ParticipantCounts(**data["counts"]),
+    )
+
+
+@router.delete("/{event_id}/participants", response_model=RemoveParticipantsResponse)
+async def delete_participants(
+    event_id: str,
+    request: RemoveParticipantsRequest,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Remove participants from an event. Only accessible by the host."""
+    # Check event exists first
+    event = event_service.get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=credentials.credentials,
+    )
+    person_id = person["person_id"]
+
+    if not event_service.is_user_host(event_id=event_id, person_id=person_id):
+        raise HTTPException(status_code=403, detail="Only the host can remove participants")
+
+    removed_count = event_service.remove_participants(
+        event_id=event_id,
+        participation_ids=request.participation_ids,
+        token=credentials.credentials,
+    )
+
+    return RemoveParticipantsResponse(removed_count=removed_count)

@@ -18,10 +18,11 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [10-schema-optimization.md](10-schema-optimization.md) | Schema-Optimierung: participation-Merge, event_media PK, timestamptz, starts_at/ends_at, RLS-Policies |
 | [11-event-draft-status.md](11-event-draft-status.md) | Event Draft-Status: DB-Migration, Access Control für Entwürfe, Veröffentlichungs-Flow, Sicherheitsmodell |
 | [12-ticket-options.md](12-ticket-options.md) | Ticket-Optionen: Preiskategorien, ticket_option-Tabelle, RLS, UPSERT-Endpoint, is_free-Logik |
+| [13-participant-management.md](13-participant-management.md) | Participant-Management: Host-Endpoints für Teilnehmer-Übersicht und -Verwaltung (M7) |
 
 ## Neue Dokumentation hinzufügen
 
-1. Neue Datei unter `documentation/` anlegen, mit nummeriertem Präfix (z. B. `08-…`).
+1. Neue Datei unter `documentation/` anlegen, mit nummeriertem Präfix (z. B. `08-…`).
 2. In dieser Tabelle eine Zeile mit Kurzbeschreibung und relativem Link ergänzen.
 
 So bleibt die Sammlung **auffindbar** und die empfohlene Lesereihenfolge erkennbar.

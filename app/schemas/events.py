@@ -46,13 +46,6 @@ class EventCreate(BaseModel):
             raise ValueError("title must be at most 255 characters")
         return v
 
-    @field_validator("starts_at")
-    @classmethod
-    def starts_at_in_future(cls, v: datetime) -> datetime:
-        if v <= datetime.now():
-            raise ValueError("starts_at must be in the future")
-        return v
-
     @field_validator("max_capacity")
     @classmethod
     def capacity_positive(cls, v: int | None) -> int | None:
@@ -141,6 +134,7 @@ class EventListItem(BaseModel):
     image_url: str | None = None
     location: LocationResponse | None = None
     participant_count: int = 0
+    is_host: bool = False
 
     class Config:
         from_attributes = True
