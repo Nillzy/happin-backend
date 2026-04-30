@@ -79,13 +79,10 @@ def _to_detail(raw: dict) -> EventDetailResponse:
     participations = raw.get("event_participation") or []
     participant_count = len(participations)
 
-    host = next(
-        (p for p in participations if p.get("role") == "Host"),
-        None,
-    )
+    hosts = raw.get("event_host") or []
     host_name = None
-    if host and host.get("person"):
-        person = host["person"]
+    if hosts:
+        person = hosts[0].get("person") or {}
         parts = [person.get("first_name", ""), person.get("last_name", "")]
         host_name = " ".join(p for p in parts if p).strip() or None
 
@@ -127,11 +124,10 @@ async def get_event_detail(
     if raw.get("status") == "draft":
         if not user:
             raise HTTPException(status_code=404, detail="Event not found")
-        participations = raw.get("event_participation") or []
+        hosts = raw.get("event_host") or []
         is_host = any(
-            p.get("role") == "Host"
-            and p.get("person", {}).get("supabase_user_id") == user.user.id
-            for p in participations
+            h.get("person", {}).get("supabase_user_id") == user.user.id
+            for h in hosts
         )
         if not is_host:
             raise HTTPException(status_code=404, detail="Event not found")

@@ -26,22 +26,22 @@ class TestIsUserHost:
     """Tests for is_user_host function."""
 
     def test_returns_true_when_user_is_host(self, mock_supabase):
-        """User with Host role returns True."""
+        """Returns True when event_host entry exists for person."""
         from app.services.event_service import is_user_host
 
-        mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(
-            data={"event_participation_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "role": "Host"}
+        mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(
+            data={"event_host_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
         )
 
         result = is_user_host(event_id="35b43254-4e21-459f-b729-4cb3966cf322", person_id="c1d2e3f4-a5b6-7890-cdef-123456789012")
 
         assert result is True
 
-    def test_returns_false_when_user_is_participant(self, mock_supabase):
-        """User with Participant role returns False."""
+    def test_returns_false_when_user_is_not_host(self, mock_supabase):
+        """Returns False when no event_host entry exists for person."""
         from app.services.event_service import is_user_host
 
-        mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(
+        mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(
             data=None
         )
 
@@ -49,11 +49,11 @@ class TestIsUserHost:
 
         assert result is False
 
-    def test_returns_false_when_no_participation(self, mock_supabase):
-        """User with no participation returns False."""
+    def test_returns_false_when_no_host_entry(self, mock_supabase):
+        """Returns False when person has no event_host entry at all."""
         from app.services.event_service import is_user_host
 
-        mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(
+        mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = MagicMock(
             data=None
         )
 
@@ -137,7 +137,7 @@ class TestRemoveParticipants:
         """Removes specified participants and returns count."""
         from app.services.event_service import remove_participants
 
-        mock_supabase.table.return_value.delete.return_value.eq.return_value.in_.return_value.neq.return_value.execute.return_value = MagicMock(
+        mock_supabase.table.return_value.delete.return_value.eq.return_value.in_.return_value.execute.return_value = MagicMock(
             data=[
                 {"event_participation_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901"},
                 {"event_participation_id": "c3d4e5f6-a7b8-9012-cdef-234567890123"},
@@ -152,7 +152,7 @@ class TestRemoveParticipants:
         """Returns 0 when no participants match."""
         from app.services.event_service import remove_participants
 
-        mock_supabase.table.return_value.delete.return_value.eq.return_value.in_.return_value.neq.return_value.execute.return_value = MagicMock(
+        mock_supabase.table.return_value.delete.return_value.eq.return_value.in_.return_value.execute.return_value = MagicMock(
             data=[]
         )
 
@@ -160,19 +160,16 @@ class TestRemoveParticipants:
 
         assert result == 0
 
-    def test_does_not_remove_hosts(self, mock_supabase):
-        """Does not remove participants with Host role."""
+    def test_only_deletes_by_participation_id(self, mock_supabase):
+        """Deletes are scoped to given participation_ids only (no role filter needed)."""
         from app.services.event_service import remove_participants
 
-        # Only non-host participant is removed
-        mock_supabase.table.return_value.delete.return_value.eq.return_value.in_.return_value.neq.return_value.execute.return_value = MagicMock(
+        mock_supabase.table.return_value.delete.return_value.eq.return_value.in_.return_value.execute.return_value = MagicMock(
             data=[{"event_participation_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901"}]
         )
 
-        result = remove_participants(event_id="35b43254-4e21-459f-b729-4cb3966cf322", participation_ids=["a1b2c3d4-e5f6-7890-abcd-ef1234567890", "b2c3d4e5-f6a7-8901-bcde-f12345678901"])  # first is host
+        result = remove_participants(event_id="35b43254-4e21-459f-b729-4cb3966cf322", participation_ids=["b2c3d4e5-f6a7-8901-bcde-f12345678901"])
 
-        # Verify neq("role", "Host") was called
-        mock_supabase.table.return_value.delete.return_value.eq.return_value.in_.return_value.neq.assert_called_with("role", "Host")
         assert result == 1
 
 

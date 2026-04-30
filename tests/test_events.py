@@ -30,16 +30,26 @@ MOCK_EVENT_RAW = {
         {"media_url": "https://example.com/image1.jpg"},
         {"media_url": "https://example.com/image2.jpg"},
     ],
+    "event_host": [
+        {
+            "person": {
+                "person_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+                "supabase_user_id": "uid-host-123",
+                "first_name": "Max",
+                "last_name": "Mustermann",
+            },
+        },
+    ],
     "event_participation": [
         {
-            "event_participation_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "role": "Host",
-            "person": {"first_name": "Max", "last_name": "Mustermann"},
-        },
-        {
-            "event_participation_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-            "role": "Participant",
-            "person": {"first_name": "Anna", "last_name": "Schmidt"},
+            "event_participation_id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+            "status": "Accepted",
+            "person": {
+                "person_id": "e5f6a7b8-c9d0-1234-5678-abcdef123456",
+                "supabase_user_id": "uid-guest-456",
+                "first_name": "Anna",
+                "last_name": "Schmidt",
+            },
         },
     ],
     "ticket_option": [],
@@ -77,7 +87,7 @@ def test_list_events_returns_data(client, mock_supabase):
     assert event["title"] == "Techno Night Berlin"
     assert "starts_at" in event
     assert event["image_url"] == "https://example.com/image1.jpg"
-    assert event["participant_count"] == 2
+    assert event["participant_count"] == 1
     assert event["location"]["city"] == "Berlin"
 
 
@@ -141,9 +151,9 @@ def test_create_event_success(client, mock_supabase):
     event_insert = MagicMock()
     event_insert.insert.return_value.execute.return_value.data = [{"event_id": "e3f4a5b6-c7d8-9012-ef01-345678901234"}]
 
-    participation_insert = MagicMock()
-    participation_insert.insert.return_value.execute.return_value.data = [
-        {"event_participation_id": "f4a5b6c7-d8e9-0123-f012-456789012345"}
+    host_insert = MagicMock()
+    host_insert.insert.return_value.execute.return_value.data = [
+        {"event_host_id": "b8c9d0e1-f2a3-4567-8901-abcdef456789"}
     ]
 
     created_event_raw = {
@@ -166,8 +176,8 @@ def test_create_event_success(client, mock_supabase):
             return location_insert
         if name == "event" and idx <= 2:
             return event_insert
-        if name == "event_participation":
-            return participation_insert
+        if name == "event_host":
+            return host_insert
         return event_select
 
     mock_supabase.table.side_effect = table_side_effect
