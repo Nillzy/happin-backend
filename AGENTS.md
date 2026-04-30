@@ -107,3 +107,8 @@ The GitLab pipeline (`.gitlab-ci.yml`) has three stages:
 3. **deploy** — manual trigger on `main`; SSHs into `vm552.ipp-vps.net` and runs `docker compose`
 
 The production server listens on `http://vm552.ipp-vps.net:8001`.
+
+## Git
+
+If you make commits, they should always be in german.
+Never push to the main branch. If you start a new topic open a new one.
