@@ -1,8 +1,11 @@
 ## Commands
 
 ```bash
-# Development
-uvicorn app.main:app --reload --port 8001   # Start dev server with auto-reload
+# Development (localhost only)
+uvicorn app.main:app --reload --port 8001
+
+# Development (accessible from network - for physical device testing)
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 
 # Testing
 pytest tests/ --tb=short                    # Run all tests
@@ -12,6 +15,55 @@ pytest tests/ --tb=short -p no:warnings     # Run tests (CI mode)
 docker build -t happin-backend .
 docker run -p 8001:8001 --env-file .env happin-backend
 ```
+
+## Local Development with Physical Devices
+
+When testing the frontend on a physical device (iPhone/Android via Expo Go), the device needs to reach the backend API. Since the device cannot access `http://localhost:8001`, you have two options:
+
+### Option 1: ngrok tunnel (Recommended)
+
+1. **Start backend on 0.0.0.0** (allows external connections):
+   ```bash
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+   ```
+
+2. **Start ngrok tunnel** (in separate terminal):
+   ```bash
+   ngrok http 8001
+   ```
+   
+   This outputs a public URL like `https://abc-xyz-123.ngrok-free.dev`
+
+3. **Update frontend `.env.local`** with the ngrok URL:
+   ```
+   EXPO_PUBLIC_BACKEND_URL=https://abc-xyz-123.ngrok-free.dev
+   ```
+
+**Note:** The ngrok URL changes on every restart unless you use a paid account with a fixed domain.
+
+### Option 2: Local IP (requires firewall configuration)
+
+1. **Start backend on 0.0.0.0**:
+   ```bash
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+   ```
+
+2. **Find your Mac's local IP**:
+   ```bash
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+   ```
+   Example output: `172.16.73.155`
+
+3. **Configure macOS Firewall**:
+   - Go to System Settings → Network → Firewall → Options
+   - Add Python to allowed apps and enable incoming connections
+
+4. **Update frontend `.env.local`**:
+   ```
+   EXPO_PUBLIC_BACKEND_URL=http://172.16.73.155:8001
+   ```
+
+5. Ensure Mac and phone are on the **same Wi-Fi network**
 
 ## Environment
 

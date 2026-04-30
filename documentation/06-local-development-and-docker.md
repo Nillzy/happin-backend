@@ -132,6 +132,8 @@ supabase/
 
 ## Server starten
 
+### Standard (localhost only)
+
 ```bash
 uvicorn app.main:app --reload --port 8001
 ```
@@ -139,6 +141,79 @@ uvicorn app.main:app --reload --port 8001
 - API-Wurzel: `http://localhost:8001/`
 - Health: `http://localhost:8001/health`
 - Mit `DEBUG=true`: `http://localhost:8001/docs`
+
+### Für physische Geräte (iPhone/Android)
+
+Wenn du die Frontend-App auf einem physischen Gerät testen willst (z.B. via Expo Go), kann das Gerät nicht auf `localhost` zugreifen. Du hast zwei Optionen:
+
+#### Option 1: ngrok Tunnel (Empfohlen)
+
+ngrok erstellt einen öffentlichen Tunnel zu deinem lokalen Backend und umgeht Firewall-Probleme:
+
+1. **Backend auf 0.0.0.0 starten** (akzeptiert externe Verbindungen):
+   ```bash
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+   ```
+
+2. **ngrok Tunnel starten** (separates Terminal):
+   ```bash
+   ngrok http 8001
+   ```
+   
+   Output:
+   ```
+   Forwarding  https://abc-xyz-123.ngrok-free.dev -> http://localhost:8001
+   ```
+
+3. **Frontend `.env.local` aktualisieren**:
+   ```
+   EXPO_PUBLIC_BACKEND_URL=https://abc-xyz-123.ngrok-free.dev
+   ```
+
+4. **Frontend neu starten** (damit neue URL geladen wird)
+
+**Hinweis:** Die ngrok-URL ändert sich bei jedem Neustart. Für eine feste URL brauchst du einen kostenpflichtigen ngrok-Account.
+
+**Vorteile:**
+- Funktioniert immer (umgeht Firewall)
+- Kein Netzwerk-Setup nötig
+- Auch außerhalb des lokalen WLANs nutzbar
+
+**Nachteile:**
+- Langsamer als direkte Verbindung (~100-300ms Latenz)
+- URL ändert sich bei jedem Neustart
+
+#### Option 2: Lokale IP-Adresse (schneller, erfordert Firewall-Konfiguration)
+
+1. **Backend auf 0.0.0.0 starten**:
+   ```bash
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+   ```
+
+2. **Mac IP-Adresse finden**:
+   ```bash
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+   ```
+   Beispiel: `172.16.73.155`
+
+3. **macOS Firewall konfigurieren**:
+   - **Systemeinstellungen → Netzwerk → Firewall → Optionen**
+   - Python hinzufügen und eingehende Verbindungen erlauben
+
+4. **Frontend `.env.local` aktualisieren**:
+   ```
+   EXPO_PUBLIC_BACKEND_URL=http://172.16.73.155:8001
+   ```
+
+5. **Mac und Gerät im gleichen WLAN**
+
+**Vorteile:**
+- Schneller als ngrok (keine zusätzliche Latenz)
+- Stabile URL (ändert sich nur, wenn sich die IP ändert)
+
+**Nachteile:**
+- Firewall muss konfiguriert werden
+- Nur im gleichen WLAN nutzbar
 
 ## Docker (lokal)
 
