@@ -1,6 +1,7 @@
 """Event-related Pydantic schemas."""
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
+from typing import Literal, Optional
 from datetime import datetime
 from app.schemas.ticket_options import TicketOptionResponse
 
@@ -108,6 +109,8 @@ class EventUpdate(BaseModel):
 
 
 class LocationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     location_id: str
     city: str | None = None
     street: str | None = None
@@ -116,11 +119,10 @@ class LocationResponse(BaseModel):
     country: str | None = None
     type: str | None = None
 
-    class Config:
-        from_attributes = True
-
 
 class EventListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     event_id: str
     title: str
     starts_at: datetime
@@ -136,9 +138,6 @@ class EventListItem(BaseModel):
     participant_count: int = 0
     is_host: bool = False
 
-    class Config:
-        from_attributes = True
-
 
 class EventListResponse(BaseModel):
     events: list[EventListItem]
@@ -152,3 +151,17 @@ class EventDetailResponse(EventListItem):
     host_name: str | None = None
     media_urls: list[str] = []
     ticket_options: list[TicketOptionResponse] = []
+    my_rsvp_status: Optional[str] = None
+
+
+class RsvpRequest(BaseModel):
+    status: Literal['Accepted', 'Declined', 'Pending']
+
+
+class RsvpResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_participation_id: str
+    event_id: str
+    person_id: str
+    status: str

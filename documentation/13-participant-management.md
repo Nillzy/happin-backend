@@ -17,7 +17,7 @@ Gibt alle Teilnehmer eines Events zurück, inklusive aggregierter Counts.
 | Auth | Bearer JWT (required) |
 | Berechtigung | Nur Event-Host |
 | Response | `ParticipantListResponse` |
-| Fehler | 401 (kein Token), 403 (kein Host), 404 (Event nicht gefunden) |
+| Fehler | 401 (kein Token), 403 (kein Host oder Event nicht gefunden) |
 
 **Response-Beispiel:**
 
@@ -54,7 +54,7 @@ Entfernt Teilnehmer aus einem Event (Bulk-Operation). Hosts können nicht entfer
 | Berechtigung | Nur Event-Host |
 | Request | `RemoveParticipantsRequest` |
 | Response | `RemoveParticipantsResponse` |
-| Fehler | 401 (kein Token), 403 (kein Host), 404 (Event nicht gefunden) |
+| Fehler | 401 (kein Token), 403 (kein Host oder Event nicht gefunden) |
 
 **Request-Body:**
 
@@ -72,9 +72,9 @@ Entfernt Teilnehmer aus einem Event (Bulk-Operation). Hosts können nicht entfer
 }
 ```
 
-## Erweiterung: `is_host` Flag in Event-Liste
+## Erweiterung: `is_host` Flag
 
-Der `GET /api/v1/events/` Endpoint wurde erweitert: Wenn ein Bearer-Token mitgesendet wird, enthält die Response für jedes Event ein `is_host: boolean` Feld. Damit kann das Frontend Events kennzeichnen, bei denen der User Host ist.
+`is_host: boolean` ist sowohl in `EventListItem` als auch in `EventDetailResponse` enthalten. Es wird im Service-Layer (`get_event_by_id` bzw. `get_public_events`) aus der `event_host`-Tabelle berechnet — nicht in `_to_detail`. Damit kann das Frontend Events kennzeichnen, bei denen der User Host ist, und den "Verwalten"-Button einblenden.
 
 ## Schemas
 
@@ -101,9 +101,9 @@ In `app/services/event_service.py`:
 
 ## Sicherheit
 
-- **Host-only Access:** Beide Endpoints prüfen, ob der anfragende User Host des Events ist
-- **Host-Schutz:** Hosts können nicht über den DELETE-Endpoint entfernt werden (Supabase-Query mit `.neq("role", "Host")`)
-- **Event-Existenz:** Beide Endpoints prüfen zuerst, ob das Event existiert (404), bevor die Host-Berechtigung geprüft wird (403)
+- **Host-only Access:** Beide Endpoints prüfen, ob der anfragende User Host des Events ist. `is_user_host` dient als einziges Gate — bei nicht-existierenden Events gibt es keinen Host-Eintrag, daher wird ebenfalls 403 zurückgegeben.
+- **Host-Schutz:** Hosts sind in `event_host` gespeichert, nicht in `event_participation`. Der DELETE-Endpoint löscht nur Einträge aus `event_participation` — Hosts können damit konstruktionsbedingt nicht versehentlich entfernt werden (kein `role`-Filter nötig).
+- **Privates Event:** `is_user_host` nutzt den anon-Supabase-Client. Da `event_host` eine eigene SELECT-Policy hat, funktioniert die Host-Prüfung auch für private Events.
 
 ## Dateien
 

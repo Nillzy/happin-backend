@@ -18,15 +18,16 @@ Lokal typischerweise `http://localhost:8001` (siehe README / Uvicorn-Port).
 |---------|------|------|--------|
 | GET | `/api/v1/user/me` | Bearer JWT | Gibt Daten des angemeldeten Nutzers zurück (Beispiel/Profil-Test); Response-Schema: `UserResponse` |
 | POST | `/api/v1/events/` | Bearer JWT | Neues Event erstellen; Request-Schema: `EventCreate`, Response-Schema: `EventDetailResponse` (201); Details: [09-event-creation.md](09-event-creation.md) |
-| GET | `/api/v1/events/{event_id}/participants` | Bearer JWT (Host-only) | Teilnehmer-Liste mit Counts; Response-Schema: `ParticipantListResponse`; Details: [11-participant-management.md](11-participant-management.md) |
-| DELETE | `/api/v1/events/{event_id}/participants` | Bearer JWT (Host-only) | Teilnehmer entfernen (Bulk); Request-Schema: `RemoveParticipantsRequest`; Details: [11-participant-management.md](11-participant-management.md) |
+| POST | `/api/v1/events/{event_id}/rsvp` | Bearer JWT | RSVP erstellen oder ändern; Request-Schema: `RsvpRequest`, Response-Schema: `RsvpResponse`; Details: [14-rsvp-and-event-host.md](14-rsvp-and-event-host.md) |
+| GET | `/api/v1/events/{event_id}/participants` | Bearer JWT (Host-only) | Teilnehmer-Liste mit Counts; Response-Schema: `ParticipantListResponse`; Details: [13-participant-management.md](13-participant-management.md) |
+| DELETE | `/api/v1/events/{event_id}/participants` | Bearer JWT (Host-only) | Teilnehmer entfernen (Bulk); Request-Schema: `RemoveParticipantsRequest`; Details: [13-participant-management.md](13-participant-management.md) |
 
 ## Öffentliche Endpoints mit optionaler Auth
 
 | Methode | Pfad | Auth | Zweck |
 |---------|------|------|--------|
 | GET | `/api/v1/events/` | Optional Bearer JWT | Öffentliche Events chronologisch auflisten; Query-Params: `limit` (1–100, default 50), `offset` (≥ 0, default 0); Response enthält `is_host: boolean` wenn Token mitgesendet; Response-Schema: `EventListResponse` |
-| GET | `/api/v1/events/{event_id}` | Optional Bearer JWT | Einzelnes Event mit vollem Detail (Location, Media, Host); Response-Schema: `EventDetailResponse`; 404 wenn nicht gefunden |
+| GET | `/api/v1/events/{event_id}` | Optional Bearer JWT | Einzelnes Event mit vollem Detail (Location, Media, Host); Response-Schema: `EventDetailResponse`; enthält `is_host` und `my_rsvp_status` wenn Token mitgesendet; 404 wenn nicht gefunden oder privates Event ohne Token |
 
 Details zu den Event-Endpoints, Architektur-Entscheidungen und Supabase-Query-Mustern: siehe [08-events-api.md](08-events-api.md).
 

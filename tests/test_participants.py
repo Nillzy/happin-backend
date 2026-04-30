@@ -235,15 +235,15 @@ class TestGetParticipantsEndpoint:
 
                         assert response.status_code == 403
 
-    def test_returns_404_when_event_not_found(self, mock_supabase, mock_person_service):
-        """Returns 404 when event does not exist."""
+    def test_returns_403_when_event_not_found(self, mock_supabase, mock_person_service):
+        """Returns 403 for non-existent events (no host entry → not authorized)."""
         with patch("app.core.supabase.create_client", return_value=mock_supabase):
             with patch("app.core.auth.get_current_user") as mock_auth:
                 mock_user = MagicMock()
                 mock_user.user.id = "user-uuid-123"
                 mock_user.user.email = "test@example.com"
                 mock_auth.return_value = mock_user
-                with patch("app.services.event_service.get_event_by_id", return_value=None):
+                with patch("app.services.event_service.is_user_host", return_value=False):
                     from app.main import app
                     client = TestClient(app)
                     response = client.get(
@@ -251,7 +251,7 @@ class TestGetParticipantsEndpoint:
                         headers={"Authorization": "Bearer test-token"},
                     )
 
-                    assert response.status_code == 404
+                    assert response.status_code == 403
 
 
 class TestDeleteParticipantsEndpoint:
@@ -301,15 +301,15 @@ class TestDeleteParticipantsEndpoint:
 
                         assert response.status_code == 403
 
-    def test_returns_404_when_event_not_found(self, mock_supabase, mock_person_service):
-        """Returns 404 when event does not exist."""
+    def test_returns_403_when_event_not_found(self, mock_supabase, mock_person_service):
+        """Returns 403 for non-existent events (no host entry → not authorized)."""
         with patch("app.core.supabase.create_client", return_value=mock_supabase):
             with patch("app.core.auth.get_current_user") as mock_auth:
                 mock_user = MagicMock()
                 mock_user.user.id = "user-uuid-123"
                 mock_user.user.email = "test@example.com"
                 mock_auth.return_value = mock_user
-                with patch("app.services.event_service.get_event_by_id", return_value=None):
+                with patch("app.services.event_service.is_user_host", return_value=False):
                     from app.main import app
                     client = TestClient(app)
                     response = client.request(
@@ -319,4 +319,4 @@ class TestDeleteParticipantsEndpoint:
                         json={"participation_ids": ["b2c3d4e5-f6a7-8901-bcde-f12345678901"]},
                     )
 
-                    assert response.status_code == 404
+                    assert response.status_code == 403

@@ -1,10 +1,10 @@
 """Application configuration and settings."""
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
     # Supabase Configuration
     SUPABASE_URL: str
@@ -15,10 +15,6 @@ class Settings(BaseSettings):
     # Application Settings
     DEBUG: bool = False
     LOG_LEVEL: str = "info"
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 # Global settings instance
