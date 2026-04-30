@@ -116,7 +116,7 @@ class EventUpdate(BaseModel):
 
 class LocationResponse(BaseModel):
     location_id: str
-    city: str
+    city: str | None = None
     street: str | None = None
     house_number: str | None = None
     postal_code: str | None = None
