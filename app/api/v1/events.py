@@ -5,7 +5,10 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.auth import get_current_user, get_current_user_optional
-from app.schemas.events import EventCreate, EventUpdate, EventListItem, EventListResponse, EventDetailResponse
+from app.schemas.events import (
+    EventCreate, EventUpdate, EventListItem, EventListResponse,
+    EventDetailResponse, RsvpRequest, RsvpResponse,
+)
 from app.schemas.ticket_options import TicketOptionResponse
 from app.schemas.participants import (
     ParticipantListResponse,
@@ -100,6 +103,7 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         image_url=image_url,
         location=raw.get("location"),
         participant_count=participant_count,
+        is_host=raw.get("is_host", False),
         invitation_link=raw.get("invitation_link"),
         created_at=raw.get("created_at"),
         updated_at=raw.get("updated_at"),
@@ -109,6 +113,7 @@ def _to_detail(raw: dict) -> EventDetailResponse:
             TicketOptionResponse(**opt)
             for opt in (raw.get("ticket_option") or [])
         ],
+        my_rsvp_status=raw.get("my_rsvp_status"),
     )
 
 
@@ -116,21 +121,16 @@ def _to_detail(raw: dict) -> EventDetailResponse:
 async def get_event_detail(
     event_id: str,
     user=Depends(get_current_user_optional),
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
 ):
-    raw = event_service.get_event_by_id(event_id)
+    supabase_user_id = user.user.id if user else None
+    token = credentials.credentials if credentials else None
+    raw = event_service.get_event_by_id(event_id, supabase_user_id, token)
     if not raw:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    if raw.get("status") == "draft":
-        if not user:
-            raise HTTPException(status_code=404, detail="Event not found")
-        hosts = raw.get("event_host") or []
-        is_host = any(
-            h.get("person", {}).get("supabase_user_id") == user.user.id
-            for h in hosts
-        )
-        if not is_host:
-            raise HTTPException(status_code=404, detail="Event not found")
+    if raw.get("status") == "draft" and not raw.get("is_host"):
+        raise HTTPException(status_code=404, detail="Event not found")
 
     return _to_detail(raw)
 
@@ -149,7 +149,7 @@ async def create_event(
         )
         person_id = person["person_id"]
 
-        raw = event_service.create_event(body.model_dump(), person_id, credentials.credentials)
+        raw = event_service.create_event(body.model_dump(), person_id, credentials.credentials, user.user.id)
         if not raw:
             raise HTTPException(status_code=500, detail="Event creation failed")
 
@@ -180,7 +180,7 @@ async def update_event_endpoint(
         if not update_data:
             raise HTTPException(status_code=400, detail="No fields to update")
 
-        raw = event_service.update_event(event_id, update_data, person_id, credentials.credentials)
+        raw = event_service.update_event(event_id, update_data, person_id, credentials.credentials, user.user.id)
         if not raw:
             raise HTTPException(status_code=403, detail="Not authorized to update this event")
 
@@ -192,6 +192,41 @@ async def update_event_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+_RSVP_STATUS_ERRORS = {
+    "event_not_found": (404, "Event not found"),
+    "event_in_past":   (400, "RSVP not possible after event has started"),
+    "public_event_accepted_only": (400, "Public events only allow status 'Accepted'"),
+    "host_cannot_rsvp": (400, "Hosts cannot RSVP their own event"),
+    "event_full": (409, "Event is fully booked"),
+}
+
+
+@router.post("/{event_id}/rsvp", response_model=RsvpResponse)
+async def rsvp_to_event(
+    event_id: str,
+    body: RsvpRequest,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    try:
+        raw = event_service.rsvp_event(
+            event_id=event_id,
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            status=body.status,
+            token=credentials.credentials,
+        )
+        return RsvpResponse(**raw)
+    except ValueError as e:
+        code, detail = _RSVP_STATUS_ERRORS.get(str(e), (400, str(e)))
+        raise HTTPException(status_code=code, detail=detail)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("RSVP error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{event_id}/participants", response_model=ParticipantListResponse)
 async def get_participants(
     event_id: str,
@@ -199,11 +234,6 @@ async def get_participants(
     credentials=Depends(HTTPBearer()),
 ):
     """Get all participants for an event. Only accessible by the host."""
-    # Check event exists first
-    event = event_service.get_event_by_id(event_id)
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-
     person = person_service.get_or_create_person(
         supabase_user_id=user.user.id,
         email=user.user.email,
@@ -245,11 +275,6 @@ async def delete_participants(
     credentials=Depends(HTTPBearer()),
 ):
     """Remove participants from an event. Only accessible by the host."""
-    # Check event exists first
-    event = event_service.get_event_by_id(event_id)
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-
     person = person_service.get_or_create_person(
         supabase_user_id=user.user.id,
         email=user.user.email,

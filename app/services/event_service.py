@@ -1,8 +1,10 @@
 """Event-related business logic and Supabase queries."""
 
 import secrets
+from datetime import datetime, timezone
 
 from app.core.supabase import get_supabase, get_supabase_for_user
+from app.services import person_service
 
 
 def _isoformat(value) -> str:
@@ -40,8 +42,8 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
     return events
 
 
-def get_event_by_id(event_id: str) -> dict | None:
-    supabase = get_supabase()
+def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: str | None = None) -> dict | None:
+    supabase = get_supabase_for_user(token) if token else get_supabase()
 
     response = (
         supabase.table("event")
@@ -55,10 +57,33 @@ def get_event_by_id(event_id: str) -> dict | None:
         .execute()
     )
 
-    return response.data if response else None
+    if not response or not response.data:
+        return None
+
+    data = response.data
+
+    if supabase_user_id:
+        participations = data.get("event_participation") or []
+        my_participation = next(
+            (p for p in participations
+             if p.get("person", {}).get("supabase_user_id") == supabase_user_id),
+            None,
+        )
+        data["my_rsvp_status"] = my_participation["status"] if my_participation else None
+
+        hosts = data.get("event_host") or []
+        data["is_host"] = any(
+            h.get("person", {}).get("supabase_user_id") == supabase_user_id
+            for h in hosts
+        )
+    else:
+        data["my_rsvp_status"] = None
+        data["is_host"] = False
+
+    return data
 
 
-def create_event(data: dict, person_id: str, token: str) -> dict:
+def create_event(data: dict, person_id: str, token: str, supabase_user_id: str | None = None) -> dict:
     supabase = get_supabase_for_user(token)
 
     location_data = data.pop("location")
@@ -99,10 +124,10 @@ def create_event(data: dict, person_id: str, token: str) -> dict:
         "event_id": event_id,
     }).execute()
 
-    return get_event_by_id(event_id)
+    return get_event_by_id(event_id, supabase_user_id=supabase_user_id, token=token)
 
 
-def update_event(event_id: str, data: dict, person_id: str, token: str) -> dict | None:
+def update_event(event_id: str, data: dict, person_id: str, token: str, supabase_user_id: str | None = None) -> dict | None:
     """Update an existing event. Only the host may update."""
     supabase = get_supabase_for_user(token)
 
@@ -142,7 +167,53 @@ def update_event(event_id: str, data: dict, person_id: str, token: str) -> dict 
     if data.get("is_free") is True:
         supabase.table("ticket_option").delete().eq("event_id", event_id).execute()
 
-    return get_event_by_id(event_id)
+    return get_event_by_id(event_id, supabase_user_id=supabase_user_id, token=token)
+
+
+def rsvp_event(event_id: str, supabase_user_id: str, email: str | None, status: str, token: str) -> dict:
+    """Create or update a guest RSVP for an event."""
+    supabase = get_supabase_for_user(token)
+
+    person = person_service.get_or_create_person(supabase_user_id, email, token)
+    person_id = person["person_id"]
+
+    event_row = (
+        supabase.table("event")
+        .select("starts_at, is_public")
+        .eq("event_id", event_id)
+        .maybe_single()
+        .execute()
+    )
+    if not event_row.data:
+        raise ValueError("event_not_found")
+
+    starts_at_str = event_row.data["starts_at"]
+    starts_at = datetime.fromisoformat(starts_at_str.replace("Z", "+00:00"))
+    if starts_at <= datetime.now(timezone.utc):
+        raise ValueError("event_in_past")
+
+    if event_row.data["is_public"] and status == "Pending":
+        raise ValueError("public_event_accepted_only")
+
+    result = supabase.rpc("rsvp_to_event", {
+        "p_event_id": event_id,
+        "p_person_id": person_id,
+        "p_status": status,
+    }).execute()
+
+    rpc_data = result.data
+    if isinstance(rpc_data, dict) and rpc_data.get("error"):
+        raise ValueError(rpc_data["error"])
+
+    participation = (
+        supabase.table("event_participation")
+        .select("event_participation_id, event_id, person_id, status")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .single()
+        .execute()
+    )
+    return participation.data
 
 
 def is_user_host(event_id: str, person_id: str) -> bool:

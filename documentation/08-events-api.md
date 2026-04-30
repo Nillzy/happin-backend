@@ -54,7 +54,7 @@ Dieses Dokument beschreibt die Events-API, die Architektur-Entscheidungen dahint
 **Response:** `EventDetailResponse` — erweitert `EventListItem` um:
 - `invitation_link` — Einladungslink
 - `created_at`, `updated_at` — Timestamps
-- `host_name` — Name des Hosts (aus `event_participation` → `person`)
+- `host_name` — Name des Hosts (aus `event_host` → `person`)
 - `media_urls` — Alle Media-URLs des Events
 
 **Fehler:** `404` wenn Event nicht existiert.
@@ -83,13 +83,15 @@ Die Supabase Python-Bibliothek nutzt PostgREST, das automatische Joins über For
 ```python
 supabase.table("event").select(
     "*, location(*), event_media(media_url), "
-    "event_participation(event_participation_id, role, person(first_name, last_name))"
+    "event_host(person(person_id, supabase_user_id, first_name, last_name)), "
+    "event_participation(event_participation_id, status, person(person_id, supabase_user_id))"
 )
 ```
 
 - `location(*)` — Join über `event.location_id → location.location_id`, gibt alle Location-Spalten zurück
 - `event_media(media_url)` — Reverse-Join über `event_media.event_id → event.event_id`, gibt nur `media_url` zurück
-- `event_participation(..., person(...))` — Verschachtelte Joins: Participation → Person
+- `event_host(person(...))` — Reverse-Join über `event_host.event_id → event.event_id`, gibt Host-Person zurück
+- `event_participation(..., person(...))` — Verschachtelte Joins: Participation (nur Gäste) → Person
 
 **Wichtig:** Dieses Muster funktioniert nur, wenn die Foreign-Key-Constraints in der DB korrekt definiert sind. Die Migration `20260428140517_remote_schema.sql` definiert alle notwendigen Keys.
 
@@ -110,8 +112,10 @@ Die verschachtelte Syntax folgt dem Foreign-Key-Pfad.
 | API-Feld | Quelle | Anmerkung |
 |----------|--------|-----------|
 | `image_url` | Erste URL aus `event_media` | Kein dediziertes `hero_image`-Feld in der DB |
-| `participant_count` | `len(event_participation)` | Zählt alle Rollen (Host + Participant) |
-| `host_name` | `event_participation` WHERE `role = 'Host'` → `person.first_name + last_name` | Erster Host wird genommen |
+| `participant_count` | `len(event_participation)` | Zählt nur Gäste (keine Hosts mehr) |
+| `host_name` | `event_host[0].person.first_name + last_name` | Eigene Tabelle, kein `role`-Filter mehr |
+| `is_host` | `event_host` WHERE `supabase_user_id` matches | Berechnet in `get_event_by_id`, `false` wenn kein Token |
+| `my_rsvp_status` | `event_participation` WHERE `supabase_user_id` matches | `null` wenn kein Token oder kein RSVP |
 | `media_urls` | Alle URLs aus `event_media` | Nur im Detail-Endpoint |
 
 ## Bekannte Schema-Lücken (Sprint 2+)

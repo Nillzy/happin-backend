@@ -1,27 +1,25 @@
 """Participant-related Pydantic schemas."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 
 class PersonInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     person_id: str
     first_name: str
     last_name: str | None = None
     phone_number: str | None = None
 
-    class Config:
-        from_attributes = True
-
 
 class ParticipantResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     participation_id: str
     person: PersonInfo
     status: str
     created_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class ParticipantCounts(BaseModel):
