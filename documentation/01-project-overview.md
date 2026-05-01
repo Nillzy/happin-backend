@@ -21,8 +21,60 @@ Die Anwendung ist ein **ASGI**-Dienst; lokal und im Container startet sie typisc
 | Konfiguration | Pydantic Settings (`pydantic-settings`) |
 | Backend-as-a-Service | Supabase Python Client |
 
-## Zustand der Codebasis
+## Project Structure
 
-Aktuell ist das Repository ein **funktionsfähiges Grundgerüst**: App-Shell, CORS, Health-Checks, Supabase-Client, JWT-Validierung und ein **Beispiel-Endpoint** für den angemeldeten Nutzer (`GET /api/v1/user/me`). Ordner wie `app/services/` und `app/utils/` sind vorgesehen, aber noch ohne fachliche Implementierung; Tests sind in CI vorbereitet, aber nicht aktiv geschaltet.
+```
+happin-backend/
+├── app/                          # Application package
+│   ├── main.py                   # FastAPI app instance, CORS, health routes, lifespan
+│   ├── core/
+│   │   ├── config.py             # Pydantic Settings — all env vars loaded here
+│   │   ├── supabase.py           # Global Supabase client (lazy initialized)
+│   │   └── auth.py               # JWT validation dependencies (get_current_user)
+│   ├── api/
+│   │   └── v1/
+│   │       ├── router.py         # Aggregates all v1 sub-routers
+│   │       ├── user.py           # /api/v1/user/* endpoints
+│   │       ├── events.py         # /api/v1/events/* endpoints
+│   │       └── ticket_options.py # /api/v1/events/{id}/ticket-options
+│   ├── schemas/
+│   │   ├── user.py               # UserResponse (Pydantic)
+│   │   ├── events.py             # EventCreate, EventDetailResponse, EventListResponse
+│   │   ├── participants.py       # RSVP participant schemas
+│   │   └── ticket_options.py     # Ticket option schemas
+│   ├── services/                 # Business logic and DB access
+│   └── utils/                    # Helper functions (formatters, validators)
+│
+├── supabase/
+│   ├── config.toml               # Supabase CLI project config
+│   └── migrations/               # SQL migrations (timestamped)
+│
+├── tests/
+│   ├── conftest.py               # Pytest fixtures; mocks Supabase before app import
+│   ├── test_health.py            # Tests for /, /health, /api/v1/health
+│   └── test_auth.py              # Tests for /api/v1/user/me auth flow
+│
+├── documentation/                # Technical documentation (you are here)
+├── .env.example                  # Environment variables template (no secrets)
+├── requirements.txt              # Python dependencies (pinned)
+├── Dockerfile                    # Multi-stage build (builder + production)
+├── .dockerignore
+├── .gitlab-ci.yml                # CI/CD pipeline: test → build → deploy
+└── README.md
+```
 
-Weitere Details zu Struktur und Betrieb stehen in den folgenden Kapiteln und im [README](../README.md).
+**Key Modules:**
+
+| Module | Responsibility |
+|--------|----------------|
+| `app/core/config.py` | Single source of truth for all environment variables |
+| `app/core/auth.py` | JWT validation via Supabase; `get_current_user` dependency |
+| `app/api/v1/router.py` | Registers all feature routers; add new endpoints here |
+| `app/schemas/` | All request/response models — never inline in route files |
+| `app/services/` | DB queries, external API calls, business rules |
+
+## Status
+
+The repository implements the MVP feature set: Auth validation, Event CRUD (Create, Read, Update), RSVP management, ticket options, and host overview. Tests run in CI, Docker images are automatically built and can be manually deployed.
+
+See the following chapters and [README](../README.md) for details on structure and operations.
