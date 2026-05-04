@@ -17,6 +17,11 @@ Lokal typischerweise `http://localhost:8001` (siehe README / Uvicorn-Port).
 | Methode | Pfad | Auth | Zweck |
 |---------|------|------|--------|
 | GET | `/api/v1/user/me` | Bearer JWT | Gibt Daten des angemeldeten Nutzers zurück (Beispiel/Profil-Test); Response-Schema: `UserResponse` |
+| GET | `/api/v1/users/me/stats` | Bearer JWT | Statistiken des Nutzers (Events besucht/erstellt, Tickets, Teilnehmer) |
+| GET | `/api/v1/users/me/events` | Bearer JWT | Eigene Events (Organizer + Teilnehmer); Query-Params: `period`, `role`, `limit`, `offset`; Details: [15-user-account-api.md](15-user-account-api.md) |
+| GET | `/api/v1/users/me/tickets` | Bearer JWT | Eigene Tickets (Participations als Proxy); Details: [15-user-account-api.md](15-user-account-api.md) |
+| PATCH | `/api/v1/users/me/name` | Bearer JWT | Vor- und Nachname in `person`-Tabelle aktualisieren |
+| DELETE | `/api/v1/users/me` | Bearer JWT | Konto und alle Daten dauerhaft löschen; Details: [15-user-account-api.md](15-user-account-api.md) |
 | POST | `/api/v1/events/` | Bearer JWT | Neues Event erstellen; Request-Schema: `EventCreate`, Response-Schema: `EventDetailResponse` (201); Details: [09-event-creation.md](09-event-creation.md) |
 | POST | `/api/v1/events/{event_id}/rsvp` | Bearer JWT | RSVP erstellen oder ändern; Request-Schema: `RsvpRequest`, Response-Schema: `RsvpResponse`; Details: [14-rsvp-and-event-host.md](14-rsvp-and-event-host.md) |
 | GET | `/api/v1/events/{event_id}/participants` | Bearer JWT (Host-only) | Teilnehmer-Liste mit Counts; Response-Schema: `ParticipantListResponse`; Details: [13-participant-management.md](13-participant-management.md) |
