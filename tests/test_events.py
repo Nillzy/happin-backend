@@ -59,8 +59,10 @@ MOCK_EVENT_RAW = {
 def _mock_chain(mock_supabase, data):
     """Set up the chained Supabase query mock to return given data."""
     chain = mock_supabase.table.return_value.select.return_value
-    # get_public_events: .eq("is_public").eq("status").order().range().execute()
-    chain.eq.return_value.eq.return_value.order.return_value.range.return_value.execute.return_value.data = data
+    # get_public_events: .eq("is_public").eq("status").gte().order().range().execute()
+    chain.eq.return_value.eq.return_value.gte.return_value.order.return_value.range.return_value.execute.return_value.data = data
+    # get_public_events_count: .eq("is_public").eq("status").gte().execute()
+    chain.eq.return_value.eq.return_value.gte.return_value.execute.return_value.count = len(data)
     # get_event_by_id: .eq("event_id").maybe_single().execute()
     chain.eq.return_value.maybe_single.return_value.execute.return_value.data = (
         data[0] if data else None

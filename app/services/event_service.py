@@ -1,7 +1,7 @@
 """Event-related business logic and Supabase queries."""
 
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from app.core.supabase import get_supabase, get_supabase_for_user
 from app.services import person_service
@@ -23,6 +23,7 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
         )
         .eq("is_public", True)
         .eq("status", "published")
+        .gte("starts_at", datetime.now(UTC).isoformat())
         .order("starts_at", desc=False)
         .range(offset, offset + limit - 1)
         .execute()
@@ -40,6 +41,20 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
             event["is_host"] = False
 
     return events
+
+def get_public_events_count() -> int:
+    supabase = get_supabase()
+
+    response = (
+        supabase.table("event")
+        .select("*", count="exact")
+        .eq("is_public", True)
+        .eq("status", "published")
+        .gte("starts_at", datetime.now(UTC).isoformat())
+        .execute()
+    )
+
+    return response.count or 0
 
 
 def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: str | None = None) -> dict | None:

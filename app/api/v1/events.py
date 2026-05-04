@@ -71,7 +71,8 @@ async def list_public_events(
 
     raw_events = event_service.get_public_events(limit=limit, offset=offset, person_id=person_id)
     events = [_to_list_item(e) for e in raw_events]
-    return EventListResponse(events=events, count=len(events))
+    count = event_service.get_public_events_count()
+    return EventListResponse(events=events, count=count)
 
 
 def _to_detail(raw: dict) -> EventDetailResponse:
