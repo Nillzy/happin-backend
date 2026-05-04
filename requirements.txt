@@ -6,6 +6,7 @@ pydantic-settings==2.1.0
 # Database & Auth
 supabase==2.29.0
 websockets>=13.0,<16
+email-validator>=2.0.0
 
 # External APIs (optional - install as needed)
 # stripe==7.0.0
