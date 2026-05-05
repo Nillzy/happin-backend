@@ -115,3 +115,20 @@ async def update_name(body: UpdateNameRequest, user=Depends(get_current_user), t
         "last_name": body.last_name if body.last_name else None,
     }).eq("person_id", person["person_id"]).execute()
     return {"first_name": body.first_name, "last_name": body.last_name}
+
+
+class UpdateCityRequest(BaseModel):
+    city: str
+
+
+@router.patch("/me/city", status_code=status.HTTP_200_OK)
+async def update_city(body: UpdateCityRequest, user=Depends(get_current_user), token: str = Depends(_token)):
+    """Update city in the person table."""
+    supabase_user_id = user.user.id
+    email = user.user.email
+    person = person_service.get_or_create_person(supabase_user_id, email, token)
+    sb = get_supabase_for_user(token)
+    sb.table("person").update({
+        "city": body.city if body.city else None,
+    }).eq("person_id", person["person_id"]).execute()
+    return {"city": body.city}
