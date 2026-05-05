@@ -12,9 +12,24 @@ def _isoformat(value) -> str:
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
 
 
-def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = None) -> list[dict]:
+def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = None) -> tuple[list[dict], int]:
+    """
+    Get public events with pagination.
+    Returns (events, total_count) tuple.
+    """
     supabase = get_supabase()
 
+    # Get total count
+    count_response = (
+        supabase.table("event")
+        .select("event_id", count="exact")
+        .eq("is_public", True)
+        .eq("status", "published")
+        .execute()
+    )
+    total_count = count_response.count if hasattr(count_response, 'count') else 0
+
+    # Get paginated events
     response = (
         supabase.table("event")
         .select(
@@ -41,7 +56,7 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
         else:
             event["is_host"] = False
 
-    return events
+    return events, total_count
 
 def get_public_events_count() -> int:
     supabase = get_supabase()

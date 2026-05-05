@@ -58,15 +58,54 @@ MOCK_EVENT_RAW = {
 
 def _mock_chain(mock_supabase, data):
     """Set up the chained Supabase query mock to return given data."""
-    chain = mock_supabase.table.return_value.select.return_value
-    # get_public_events: .eq("is_public").eq("status").gte().order().range().execute()
-    chain.eq.return_value.eq.return_value.gte.return_value.order.return_value.range.return_value.execute.return_value.data = data
-    # get_public_events_count: .eq("is_public").eq("status").gte().execute()
-    chain.eq.return_value.eq.return_value.gte.return_value.execute.return_value.count = len(data)
-    # get_event_by_id: .eq("event_id").maybe_single().execute()
-    chain.eq.return_value.maybe_single.return_value.execute.return_value.data = (
-        data[0] if data else None
-    )
+    table_mock = mock_supabase.table.return_value
+
+    # Create two different select mocks based on arguments
+    def select_side_effect(*args, **kwargs):
+        select_result = MagicMock()
+
+        # Count query: .select("event_id", count="exact").eq().eq().execute()
+        # Note: NO .gte() call for count query!
+        if kwargs.get("count") == "exact":
+            count_response = MagicMock()
+            count_response.count = len(data)
+
+            # Build chain: select -> eq -> eq -> execute
+            eq1_mock = MagicMock()
+            eq2_mock = MagicMock()
+            eq2_mock.execute.return_value = count_response
+            eq1_mock.eq.return_value = eq2_mock
+            select_result.eq.return_value = eq1_mock
+
+            return select_result
+
+        # Events query: .select(...).eq().eq().gte().order().range().execute()
+        events_response = MagicMock()
+        events_response.data = data
+
+        # Build chain: select -> eq -> eq -> gte -> order -> range -> execute
+        eq1_mock = MagicMock()
+        eq2_mock = MagicMock()
+        gte_mock = MagicMock()
+        order_mock = MagicMock()
+        range_mock = MagicMock()
+        range_mock.execute.return_value = events_response
+        order_mock.range.return_value = range_mock
+        gte_mock.order.return_value = order_mock
+        eq2_mock.gte.return_value = gte_mock
+        eq1_mock.eq.return_value = eq2_mock
+        select_result.eq.return_value = eq1_mock
+
+        # Detail query: .select(...).eq().maybe_single().execute()
+        detail_response = MagicMock()
+        detail_response.data = data[0] if data else None
+        maybe_single_mock = MagicMock()
+        maybe_single_mock.execute.return_value = detail_response
+        eq1_mock.maybe_single.return_value = maybe_single_mock
+
+        return select_result
+
+    table_mock.select.side_effect = select_side_effect
 
 
 def test_list_events_empty(client, mock_supabase):
