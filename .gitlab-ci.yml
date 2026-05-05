@@ -15,7 +15,6 @@ test:
   script:
     - pytest tests/ --tb=short -p no:warnings
   only:
-    - main
     - merge_requests
 
 # Build Docker image and push to GitLab Container Registry
