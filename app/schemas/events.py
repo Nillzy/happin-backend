@@ -118,6 +118,8 @@ class LocationResponse(BaseModel):
     postal_code: str | None = None
     country: str | None = None
     type: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class EventListItem(BaseModel):

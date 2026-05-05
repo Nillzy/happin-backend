@@ -5,6 +5,7 @@ from datetime import datetime, timezone, UTC
 
 from app.core.supabase import get_supabase, get_supabase_for_user
 from app.services import person_service
+from app.services.geocoding_service import geocode_address
 
 
 def _isoformat(value) -> str:
@@ -109,6 +110,19 @@ def create_event(data: dict, person_id: str, token: str, supabase_user_id: str |
         .execute()
     )
     location_id = location_resp.data[0]["location_id"]
+
+    coords = geocode_address(
+        street=location_data.get("street"),
+        house_number=location_data.get("house_number"),
+        postal_code=location_data.get("postal_code"),
+        city=location_data.get("city"),
+        country=location_data.get("country"),
+    )
+    if coords:
+        supabase.table("location").update({
+            "latitude": coords[0],
+            "longitude": coords[1],
+        }).eq("location_id", location_id).execute()
 
     invitation_link = secrets.token_urlsafe(16)
 

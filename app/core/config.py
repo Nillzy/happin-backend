@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     LOG_LEVEL: str = "info"
 
+    # MapTiler Geocoding
+    MAPTILER_KEY: str | None = None
+
 
 # Global settings instance
 settings = Settings()
