@@ -19,12 +19,13 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
     """
     supabase = get_supabase()
 
-    # Get total count
+    # Get total count (same filters as paginated query)
     count_response = (
         supabase.table("event")
         .select("event_id", count="exact")
         .eq("is_public", True)
         .eq("status", "published")
+        .gte("starts_at", datetime.now(UTC).isoformat())
         .execute()
     )
     total_count = count_response.count if hasattr(count_response, 'count') else 0

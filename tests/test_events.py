@@ -64,16 +64,17 @@ def _mock_chain(mock_supabase, data):
     def select_side_effect(*args, **kwargs):
         select_result = MagicMock()
 
-        # Count query: .select("event_id", count="exact").eq().eq().execute()
-        # Note: NO .gte() call for count query!
+        # Count query: .select("event_id", count="exact").eq().eq().gte().execute()
         if kwargs.get("count") == "exact":
             count_response = MagicMock()
             count_response.count = len(data)
 
-            # Build chain: select -> eq -> eq -> execute
+            # Build chain: select -> eq -> eq -> gte -> execute
             eq1_mock = MagicMock()
             eq2_mock = MagicMock()
-            eq2_mock.execute.return_value = count_response
+            gte_mock = MagicMock()
+            gte_mock.execute.return_value = count_response
+            eq2_mock.gte.return_value = gte_mock
             eq1_mock.eq.return_value = eq2_mock
             select_result.eq.return_value = eq1_mock
 
