@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Literal, Optional
 from datetime import datetime
 from app.schemas.ticket_options import TicketOptionResponse
+from app.schemas.custom_fields import CustomFieldResponse
 
 
 class LocationCreate(BaseModel):
@@ -158,6 +159,7 @@ class EventDetailResponse(EventListItem):
     host_name: str | None = None
     media_urls: list[str] = []
     ticket_options: list[TicketOptionResponse] = []
+    custom_fields: list[CustomFieldResponse] = []
     my_rsvp_status: Optional[str] = None
 
 

@@ -11,6 +11,7 @@ from app.schemas.events import (
     EventDetailResponse, RsvpRequest, RsvpResponse,
 )
 from app.schemas.ticket_options import TicketOptionResponse
+from app.schemas.custom_fields import CustomFieldResponse
 from app.schemas.participants import (
     ParticipantListResponse,
     ParticipantResponse,
@@ -149,6 +150,10 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         ticket_options=[
             TicketOptionResponse(**opt)
             for opt in (raw.get("ticket_option") or [])
+        ],
+        custom_fields=[
+            CustomFieldResponse(**f)
+            for f in (raw.get("custom_field") or [])
         ],
         my_rsvp_status=raw.get("my_rsvp_status"),
     )
