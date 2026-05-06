@@ -2,6 +2,7 @@
 
 import logging
 
+from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.auth import get_current_user, get_current_user_optional
@@ -20,6 +21,7 @@ from app.schemas.participants import (
 )
 from app.services import event_service
 from app.services import person_service
+from app.services import user_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -72,6 +74,39 @@ async def list_public_events(
     raw_events, total_count = event_service.get_public_events(limit=limit, offset=offset, person_id=person_id)
     events = [_to_list_item(e) for e in raw_events]
     return EventListResponse(events=events, count=total_count)
+
+
+_bearer = HTTPBearer()
+
+
+def _me_token(credentials=Depends(_bearer)) -> str:
+    return credentials.credentials
+
+
+@router.get("/me", response_model=EventListResponse)
+async def get_my_events(
+    role: Optional[Literal["organizer", "attendee"]] = Query(None),
+    period: Literal["upcoming", "past"] = Query("upcoming"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    user=Depends(get_current_user),
+    token: str = Depends(_me_token),
+):
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=token,
+    )
+    raw = user_service.get_user_events(
+        person_id=person["person_id"],
+        token=token,
+        role=role,
+        period=period,
+        limit=limit,
+        offset=offset,
+    )
+    events = [_to_list_item(e) for e in raw]
+    return EventListResponse(events=events, count=len(events))
 
 
 def _to_detail(raw: dict) -> EventDetailResponse:
