@@ -156,6 +156,8 @@ def create_event(data: dict, person_id: str, token: str, supabase_user_id: str |
     }
     if data.get("ends_at"):
         event_payload["ends_at"] = _isoformat(data["ends_at"])
+    if data.get("gradient_id") is not None:
+        event_payload["gradient_id"] = data["gradient_id"]
 
     event_resp = (
         supabase.table("event")
@@ -168,6 +170,13 @@ def create_event(data: dict, person_id: str, token: str, supabase_user_id: str |
         "person_id": person_id,
         "event_id": event_id,
     }).execute()
+
+    image_url = data.get("image_url")
+    if image_url:
+        supabase.table("event_media").insert({
+            "event_id": event_id,
+            "media_url": image_url,
+        }).execute()
 
     return get_event_by_id(event_id, supabase_user_id=supabase_user_id, token=token)
 
@@ -201,10 +210,34 @@ def update_event(event_id: str, data: dict, person_id: str, token: str, supabase
         if loc_patch:
             supabase.table("location").update(loc_patch).eq("location_id", location_id).execute()
 
+    has_image_url_field = "image_url" in data
+    image_url = data.pop("image_url", None)
+    if has_image_url_field:
+        existing_media = (
+            supabase.table("event_media")
+            .select("media_id")
+            .eq("event_id", event_id)
+            .limit(1)
+            .execute()
+        )
+        if image_url:
+            if existing_media.data:
+                supabase.table("event_media").update({
+                    "media_url": image_url,
+                }).eq("media_id", existing_media.data[0]["media_id"]).execute()
+            else:
+                supabase.table("event_media").insert({
+                    "event_id": event_id,
+                    "media_url": image_url,
+                }).execute()
+        elif existing_media.data:
+            supabase.table("event_media").delete().eq(
+                "media_id", existing_media.data[0]["media_id"]
+            ).execute()
+
     event_patch = {}
     for key, value in data.items():
-        if value is not None:
-            event_patch[key] = _isoformat(value) if hasattr(value, "isoformat") else value
+        event_patch[key] = _isoformat(value) if hasattr(value, "isoformat") else value
 
     if event_patch:
         supabase.table("event").update(event_patch).eq("event_id", event_id).execute()
