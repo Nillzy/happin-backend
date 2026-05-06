@@ -121,6 +121,19 @@ class UpdateCityRequest(BaseModel):
     city: str
 
 
+@router.get("/me/profile", status_code=status.HTTP_200_OK)
+async def get_profile(user=Depends(get_current_user), token: str = Depends(_token)):
+    """Get basic profile info including city."""
+    supabase_user_id = user.user.id
+    email = user.user.email
+    person = person_service.get_or_create_person(supabase_user_id, email, token)
+    return {
+        "city": person.get("city") or "",
+        "first_name": person.get("first_name") or "",
+        "last_name": person.get("last_name") or "",
+    }
+
+
 @router.patch("/me/city", status_code=status.HTTP_200_OK)
 async def update_city(body: UpdateCityRequest, user=Depends(get_current_user), token: str = Depends(_token)):
     """Update city in the person table."""
