@@ -52,12 +52,13 @@ def get_user_stats(person_id: str) -> dict:
 
 def get_user_events(
     person_id: str,
+    token: str,
     role: str | None = None,
     period: str = "upcoming",
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
-    supabase = get_supabase()
+    supabase = get_supabase_for_user(token)
     now = datetime.now(timezone.utc).isoformat()
 
     events: list[dict] = []

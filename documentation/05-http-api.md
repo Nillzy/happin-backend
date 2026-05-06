@@ -18,7 +18,7 @@ Lokal typischerweise `http://localhost:8001` (siehe README / Uvicorn-Port).
 |---------|------|------|--------|
 | GET | `/api/v1/user/me` | Bearer JWT | Gibt Daten des angemeldeten Nutzers zurück (Beispiel/Profil-Test); Response-Schema: `UserResponse` |
 | GET | `/api/v1/users/me/stats` | Bearer JWT | Statistiken des Nutzers (Events besucht/erstellt, Tickets, Teilnehmer) |
-| GET | `/api/v1/users/me/events` | Bearer JWT | Eigene Events (Organizer + Teilnehmer); Query-Params: `period`, `role`, `limit`, `offset`; Details: [15-user-account-api.md](15-user-account-api.md) |
+| GET | `/api/v1/events/me` | Bearer JWT | Eigene Events (Organizer + Teilnehmer); Query-Params: `period`, `role`, `limit`, `offset`; Details: [15-user-account-api.md](15-user-account-api.md) |
 | GET | `/api/v1/users/me/tickets` | Bearer JWT | Eigene Tickets (Participations als Proxy); Details: [15-user-account-api.md](15-user-account-api.md) |
 | PATCH | `/api/v1/users/me/name` | Bearer JWT | Vor- und Nachname in `person`-Tabelle aktualisieren |
 | DELETE | `/api/v1/users/me` | Bearer JWT | Konto und alle Daten dauerhaft löschen; Details: [15-user-account-api.md](15-user-account-api.md) |

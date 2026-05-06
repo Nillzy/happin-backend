@@ -3,7 +3,7 @@
 import secrets
 from datetime import datetime, timezone, UTC
 
-from app.core.supabase import get_supabase, get_supabase_for_user
+from app.core.supabase import get_supabase, get_supabase_for_user, get_supabase_admin
 from app.services import person_service
 from app.services.geocoding_service import geocode_address
 
@@ -307,14 +307,15 @@ def get_event_participants(event_id: str) -> dict:
 
 
 def remove_participants(event_id: str, participation_ids: list[str], token: str | None = None) -> int:
-    """Remove participants from an event. Does not remove hosts."""
+    """Remove participants from an event. Does not remove hosts.
+    Requires a user token — RLS policy ensures only hosts can delete."""
     if token:
-        supabase = get_supabase_for_user(token)
+        client = get_supabase_for_user(token)
     else:
-        supabase = get_supabase()
+        client = get_supabase()
 
     response = (
-        supabase.table("event_participation")
+        client.table("event_participation")
         .delete()
         .eq("event_id", event_id)
         .in_("event_participation_id", participation_ids)

@@ -7,7 +7,7 @@ Alle Endpoints unter `/api/v1/users/` erfordern einen gültigen Bearer-JWT.
 | Methode | Pfad | Zweck |
 |---------|------|--------|
 | GET | `/api/v1/users/me/stats` | Statistiken des eingeloggten Nutzers |
-| GET | `/api/v1/users/me/events` | Eigene Events (als Organizer oder Teilnehmer) |
+| GET | `/api/v1/events/me` | Eigene Events (als Organizer oder Teilnehmer) |
 | GET | `/api/v1/users/me/tickets` | Eigene Tickets (Participations als Proxy) |
 | PATCH | `/api/v1/users/me/name` | Vor- und Nachname in `person`-Tabelle aktualisieren |
 | DELETE | `/api/v1/users/me` | Konto und alle Daten dauerhaft löschen |
@@ -36,9 +36,11 @@ Gibt aggregierte Kennzahlen für den eingeloggten Nutzer zurück.
 
 ---
 
-## GET /me/events
+## GET /api/v1/events/me
 
 Gibt Events zurück, die der Nutzer organisiert oder an denen er per RSVP teilnimmt.
+
+**Hinweis:** Dieser Endpoint liegt unter `/api/v1/events/me` (nicht unter `/users/`), da er thematisch zum Events-Router gehört.
 
 **Query-Parameter:**
 
