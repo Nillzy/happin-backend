@@ -14,8 +14,8 @@ test:
     - pip install -r requirements.txt
   script:
     - pytest tests/ --tb=short -p no:warnings
-  only:
-    - merge_requests
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 # Build Docker image and push to GitLab Container Registry
 build:
@@ -33,8 +33,8 @@ build:
     # Push both tags
     - docker push $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA
     - docker push $CI_REGISTRY_IMAGE/backend:latest
-  only:
-    - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
 
 # Deploy to VM (manual trigger)
 deploy:
@@ -49,8 +49,8 @@ deploy:
     - ssh-keyscan -H vm552.ipp-vps.net >> ~/.ssh/known_hosts
   script:
     - ssh happin-deploy@vm552.ipp-vps.net "echo $GITLAB_DEPLOY_TOKEN | docker login registry.gitlab.com -u $GITLAB_DEPLOY_USERNAME --password-stdin && cd /home/shared/deployment && docker compose down backend && docker rmi registry.gitlab.com/dhbw-se/se-tinf24b2/happin/backend/backend:latest || true && cd /home/shared/deployment/backend && git pull origin main && cd /home/shared/deployment && docker compose pull backend && docker compose up -d backend"
-  only:
-    - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
   environment:
     name: production
     url: http://vm552.ipp-vps.net:8001
