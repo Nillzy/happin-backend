@@ -36,6 +36,8 @@ class EventCreate(BaseModel):
     is_free: bool = True
     location: LocationCreate
     status: str = "published"
+    image_url: str | None = None
+    gradient_id: int | None = None
 
     @field_validator("title")
     @classmethod
@@ -81,6 +83,8 @@ class EventUpdate(BaseModel):
     is_free: bool | None = None
     status: str | None = None
     location: LocationUpdate | None = None
+    image_url: str | None = None
+    gradient_id: int | None = None
 
     @field_validator("title")
     @classmethod
@@ -136,6 +140,7 @@ class EventListItem(BaseModel):
     is_free: bool = True
     status: str = "published"
     image_url: str | None = None
+    gradient_id: int | None = None
     location: LocationResponse | None = None
     participant_count: int = 0
     is_host: bool = False
