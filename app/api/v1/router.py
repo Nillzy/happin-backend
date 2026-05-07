@@ -1,7 +1,7 @@
 """API v1 main router - aggregates all sub-routers."""
 
 from fastapi import APIRouter
-from app.api.v1 import user, users, events, ticket_options, images
+from app.api.v1 import user, users, events, ticket_options, tickets, images
 
 # Create main v1 router
 router = APIRouter(prefix="/api/v1")
@@ -17,6 +17,9 @@ router.include_router(events.router, prefix="/events", tags=["events"])
 
 # Include ticket options router (nested under events)
 router.include_router(ticket_options.router, prefix="/events", tags=["ticket-options"])
+
+# Include tickets router (booking tickets for events)
+router.include_router(tickets.router, prefix="/events", tags=["tickets"])
 
 # Include images router (Unsplash proxy)
 router.include_router(images.router, prefix="/images", tags=["images"])

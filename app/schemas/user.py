@@ -22,13 +22,17 @@ class UserStatsResponse(BaseModel):
 
 class TicketItem(BaseModel):
     ticket_id: str
+    qr_token: str
     event_id: str
     event_title: str
+    starts_at: datetime | None = None
+    city: str | None = None
     ticket_option_name: str
     price: float
     currency: str
     status: str
-    purchased_at: datetime | None = None
+    created_at: datetime | None = None
+    used_at: datetime | None = None
 
 
 class TicketListResponse(BaseModel):
