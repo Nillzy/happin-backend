@@ -233,7 +233,6 @@ _RSVP_STATUS_ERRORS = {
     "event_not_found": (404, "Event not found"),
     "event_in_past":   (400, "RSVP not possible after event has started"),
     "public_event_accepted_only": (400, "Public events only allow status 'Accepted'"),
-    "host_cannot_rsvp": (400, "Hosts cannot RSVP their own event"),
     "event_full": (409, "Event is fully booked"),
 }
 
