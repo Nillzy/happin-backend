@@ -1,8 +1,7 @@
 """Ticket business logic — generation, deletion, and retrieval."""
 
-import secrets
-
 from app.core.supabase import get_supabase_for_user
+from app.core.ticket_token import generate_ticket_token, verify_ticket_token
 
 
 def create_tickets(
@@ -11,16 +10,38 @@ def create_tickets(
     token: str,
     ticket_option_id: str | None = None,
     quantity: int = 1,
+    guest_name: str | None = None,
+    ticket_option_name: str | None = None,
 ) -> list[dict]:
-    """Create one or more tickets, each with a unique qr_token."""
+    """Create one or more tickets with HMAC-signed qr_tokens."""
     supabase = get_supabase_for_user(token)
 
+    if not guest_name:
+        person = supabase.table("person").select("first_name, last_name").eq("person_id", person_id).single().execute()
+        p = person.data or {}
+        parts = [p.get("first_name", ""), p.get("last_name", "")]
+        guest_name = " ".join(x for x in parts if x).strip() or "Gast"
+
+    if ticket_option_id and not ticket_option_name:
+        opt = supabase.table("ticket_option").select("name").eq("ticket_option_id", ticket_option_id).single().execute()
+        ticket_option_name = (opt.data or {}).get("name")
+
+    existing_count = (
+        supabase.table("ticket")
+        .select("ticket_id", count="exact")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .execute()
+    ).count or 0
+
     payloads = []
-    for _ in range(quantity):
+    for i in range(quantity):
+        ticket_nr = existing_count + i + 1
+        qr_token = generate_ticket_token(event_id, guest_name, ticket_nr, ticket_option_name)
         payload: dict = {
             "event_id": event_id,
             "person_id": person_id,
-            "qr_token": secrets.token_urlsafe(32),
+            "qr_token": qr_token,
         }
         if ticket_option_id:
             payload["ticket_option_id"] = ticket_option_id
@@ -80,3 +101,60 @@ def get_tickets_for_person(person_id: str, token: str) -> dict:
         })
 
     return {"tickets": tickets, "total": len(tickets)}
+
+
+def validate_ticket(event_id: str, qr_token: str, token: str) -> dict:
+    """Validate and mark a ticket as used. Returns scan result dict."""
+    from datetime import datetime, timezone
+
+    payload = verify_ticket_token(qr_token, event_id)
+    if not payload:
+        return {"valid": False, "reason": "not_found"}
+
+    supabase = get_supabase_for_user(token)
+
+    row = (
+        supabase.table("ticket")
+        .select("ticket_id, status, used_at")
+        .eq("event_id", event_id)
+        .eq("qr_token", qr_token)
+        .maybe_single()
+        .execute()
+    )
+
+    if not row or not row.data:
+        return {"valid": False, "reason": "not_found"}
+
+    ticket = row.data
+    guest_name = payload.get("name")
+    ticket_number = payload.get("nr")
+    option_name = payload.get("opt")
+
+    if ticket["status"] == "used":
+        return {
+            "valid": False,
+            "reason": "already_used",
+            "guest_name": guest_name,
+            "used_at": ticket.get("used_at"),
+            "ticket_number": ticket_number,
+            "option_name": option_name,
+        }
+
+    now = datetime.now(timezone.utc).isoformat()
+    update_result = (
+        supabase.table("ticket")
+        .update({"status": "used", "used_at": now})
+        .eq("ticket_id", ticket["ticket_id"])
+        .execute()
+    )
+
+    if not update_result.data:
+        raise PermissionError("Could not mark ticket as used — UPDATE policy missing?")
+
+    return {
+        "valid": True,
+        "guest_name": guest_name,
+        "used_at": now,
+        "ticket_number": ticket_number,
+        "option_name": option_name,
+    }

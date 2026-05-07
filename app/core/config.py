@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Unsplash API
     UNSPLASH_ACCESS_KEY: str | None = None
 
+    # Ticket HMAC signing
+    TICKET_SIGNING_KEY: str = ""
+
 
 # Global settings instance
 settings = Settings()

@@ -11,6 +11,7 @@ from app.schemas.events import (
     EventDetailResponse, RsvpRequest, RsvpResponse,
 )
 from app.schemas.ticket_options import TicketOptionResponse
+from app.schemas.tickets import ScanTicketRequest, ScanTicketResponse
 from app.schemas.participants import (
     ParticipantListResponse,
     ParticipantResponse,
@@ -260,9 +261,17 @@ async def rsvp_to_event(
             token=credentials.credentials,
         )
         person_id = person["person_id"]
+        guest_name = " ".join(
+            p for p in [person.get("first_name", ""), person.get("last_name", "")] if p
+        ).strip() or None
 
         if body.status == "Accepted":
-            ticket_service.create_tickets(event_id=event_id, person_id=person_id, token=credentials.credentials)
+            ticket_service.create_tickets(
+                event_id=event_id,
+                person_id=person_id,
+                token=credentials.credentials,
+                guest_name=guest_name,
+            )
         elif body.status == "Declined":
             ticket_service.delete_tickets_for_event(event_id=event_id, person_id=person_id, token=credentials.credentials)
 
@@ -294,7 +303,7 @@ async def get_participants(
     if not event_service.is_user_host(event_id=event_id, person_id=person_id):
         raise HTTPException(status_code=403, detail="Only the host can view participants")
 
-    data = event_service.get_event_participants(event_id=event_id)
+    data = event_service.get_event_participants(event_id=event_id, token=credentials.credentials)
 
     participants = [
         ParticipantResponse(
@@ -306,6 +315,7 @@ async def get_participants(
                 phone_number=p["person"].get("phone_number"),
             ),
             status=p["status"],
+            ticket_count=p.get("ticket_count", 0),
             created_at=p.get("created_at"),
         )
         for p in data["participants"]
@@ -342,3 +352,33 @@ async def delete_participants(
     )
 
     return RemoveParticipantsResponse(removed_count=removed_count)
+
+
+@router.post("/{event_id}/tickets/scan", response_model=ScanTicketResponse)
+async def scan_ticket(
+    event_id: str,
+    body: ScanTicketRequest,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Validate and scan a ticket QR code. Only accessible by the host."""
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=credentials.credentials,
+    )
+    person_id = person["person_id"]
+
+    if not event_service.is_user_host(event_id=event_id, person_id=person_id):
+        raise HTTPException(status_code=403, detail="Only the host can scan tickets")
+
+    try:
+        result = ticket_service.validate_ticket(
+            event_id=event_id,
+            qr_token=body.qr_token,
+            token=credentials.credentials,
+        )
+    except PermissionError as e:
+        logger.error("Ticket update blocked by RLS: %s", e)
+        raise HTTPException(status_code=500, detail="Ticket konnte nicht als verwendet markiert werden")
+    return ScanTicketResponse(**result)

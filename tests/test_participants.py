@@ -8,10 +8,10 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def mock_supabase():
     """Create a mock Supabase client."""
-    with patch("app.services.event_service.get_supabase") as mock_get:
-        mock_client = MagicMock()
-        mock_get.return_value = mock_client
-        yield mock_client
+    mock_client = MagicMock()
+    with patch("app.services.event_service.get_supabase", return_value=mock_client):
+        with patch("app.services.event_service.get_supabase_for_user", return_value=mock_client):
+            yield mock_client
 
 
 @pytest.fixture
@@ -69,45 +69,51 @@ class TestGetEventParticipants:
         """Returns participant list with status counts."""
         from app.services.event_service import get_event_participants
 
-        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
-            data=[
-                {
-                    "event_participation_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                    "status": "Accepted",
-                    "created_at": "2026-04-20T14:30:00Z",
-                    "person": {
-                        "person_id": "c1d2e3f4-a5b6-7890-cdef-123456789012",
-                        "first_name": "Max",
-                        "last_name": "Lehmann",
-                        "phone_number": "+49 170 1234567",
-                    },
+        participants_data = [
+            {
+                "event_participation_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "status": "Accepted",
+                "created_at": "2026-04-20T14:30:00Z",
+                "person": {
+                    "person_id": "c1d2e3f4-a5b6-7890-cdef-123456789012",
+                    "first_name": "Max",
+                    "last_name": "Lehmann",
+                    "phone_number": "+49 170 1234567",
                 },
-                {
-                    "event_participation_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-                    "status": "Declined",
-                    "created_at": "2026-04-20T15:00:00Z",
-                    "person": {
-                        "person_id": "d2e3f4a5-b6c7-8901-def0-234567890123",
-                        "first_name": "Sophie",
-                        "last_name": "Klein",
-                        "phone_number": "+49 151 9876543",
-                    },
+            },
+            {
+                "event_participation_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                "status": "Declined",
+                "created_at": "2026-04-20T15:00:00Z",
+                "person": {
+                    "person_id": "d2e3f4a5-b6c7-8901-def0-234567890123",
+                    "first_name": "Sophie",
+                    "last_name": "Klein",
+                    "phone_number": "+49 151 9876543",
                 },
-                {
-                    "event_participation_id": "c3d4e5f6-a7b8-9012-cdef-234567890123",
-                    "status": "Pending",
-                    "created_at": "2026-04-20T16:00:00Z",
-                    "person": {
-                        "person_id": "e3f4a5b6-c7d8-9012-ef01-345678901234",
-                        "first_name": "Jonas",
-                        "last_name": None,
-                        "phone_number": None,
-                    },
+            },
+            {
+                "event_participation_id": "c3d4e5f6-a7b8-9012-cdef-234567890123",
+                "status": "Pending",
+                "created_at": "2026-04-20T16:00:00Z",
+                "person": {
+                    "person_id": "e3f4a5b6-c7d8-9012-ef01-345678901234",
+                    "first_name": "Jonas",
+                    "last_name": None,
+                    "phone_number": None,
                 },
-            ]
-        )
+            },
+        ]
+        tickets_data = [
+            {"ticket_id": "t1", "person_id": "c1d2e3f4-a5b6-7890-cdef-123456789012"},
+        ]
 
-        result = get_event_participants(event_id="35b43254-4e21-459f-b729-4cb3966cf322")
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+            MagicMock(data=participants_data),
+            MagicMock(data=tickets_data),
+        ]
+
+        result = get_event_participants(event_id="35b43254-4e21-459f-b729-4cb3966cf322", token="fake-token")
 
         assert len(result["participants"]) == 3
         assert result["counts"]["accepted"] == 1
@@ -118,11 +124,12 @@ class TestGetEventParticipants:
         """Returns empty list with zero counts when no participants."""
         from app.services.event_service import get_event_participants
 
-        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
-            data=[]
-        )
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+            MagicMock(data=[]),
+            MagicMock(data=[]),
+        ]
 
-        result = get_event_participants(event_id="35b43254-4e21-459f-b729-4cb3966cf322")
+        result = get_event_participants(event_id="35b43254-4e21-459f-b729-4cb3966cf322", token="fake-token")
 
         assert result["participants"] == []
         assert result["counts"]["accepted"] == 0

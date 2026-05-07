@@ -31,6 +31,9 @@ async def create_tickets(
             token=token,
         )
         person_id = person["person_id"]
+        guest_name = " ".join(
+            p for p in [person.get("first_name", ""), person.get("last_name", "")] if p
+        ).strip() or None
 
         # Capacity check: current tickets + requested quantity must fit
         supabase = get_supabase_for_user(token)
@@ -69,6 +72,7 @@ async def create_tickets(
             token=token,
             ticket_option_id=body.ticket_option_id,
             quantity=body.quantity,
+            guest_name=guest_name,
         )
 
         return CreateTicketsResponse(tickets=tickets)
