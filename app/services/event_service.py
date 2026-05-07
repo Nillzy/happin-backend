@@ -311,9 +311,9 @@ def is_user_host(event_id: str, person_id: str) -> bool:
     return response is not None and response.data is not None
 
 
-def get_event_participants(event_id: str) -> dict:
+def get_event_participants(event_id: str, token: str) -> dict:
     """Get all participants for an event with counts by status."""
-    supabase = get_supabase()
+    supabase = get_supabase_for_user(token)
 
     response = (
         supabase.table("event_participation")
@@ -324,15 +324,28 @@ def get_event_participants(event_id: str) -> dict:
 
     participants = response.data if response.data else []
 
-    counts = {"accepted": 0, "declined": 0, "pending": 0}
+    ticket_response = (
+        supabase.table("ticket")
+        .select("ticket_id, person_id")
+        .eq("event_id", event_id)
+        .execute()
+    )
+    tickets = ticket_response.data or []
+
+    ticket_counts_by_person: dict[str, int] = {}
+    for t in tickets:
+        pid = t["person_id"]
+        ticket_counts_by_person[pid] = ticket_counts_by_person.get(pid, 0) + 1
+
+    counts = {"accepted": len(tickets), "declined": 0, "pending": 0}
     for p in participants:
         status = p.get("status", "").lower()
-        if status == "accepted":
-            counts["accepted"] += 1
-        elif status == "declined":
+        if status == "declined":
             counts["declined"] += 1
         elif status == "pending":
             counts["pending"] += 1
+        person_id = p.get("person", {}).get("person_id")
+        p["ticket_count"] = ticket_counts_by_person.get(person_id, 0) if person_id else 0
 
     return {
         "participants": participants,

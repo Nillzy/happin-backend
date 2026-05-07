@@ -10,3 +10,16 @@ class CreateTicketsRequest(BaseModel):
 
 class CreateTicketsResponse(BaseModel):
     tickets: list[dict]
+
+
+class ScanTicketRequest(BaseModel):
+    qr_token: str
+
+
+class ScanTicketResponse(BaseModel):
+    valid: bool
+    reason: str | None = None
+    guest_name: str | None = None
+    used_at: str | None = None
+    ticket_number: int | None = None
+    option_name: str | None = None

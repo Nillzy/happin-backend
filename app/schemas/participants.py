@@ -19,6 +19,7 @@ class ParticipantResponse(BaseModel):
     participation_id: str
     person: PersonInfo
     status: str
+    ticket_count: int = 0
     created_at: datetime | None = None
 
 

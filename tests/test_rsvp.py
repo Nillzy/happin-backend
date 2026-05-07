@@ -181,13 +181,15 @@ class TestRsvpEndpoint:
         with patch("app.core.auth.get_current_user") as mock_auth:
             mock_auth.return_value = MagicMock(user=MagicMock(id="uid-123", email="test@example.com"))
             with patch("app.services.event_service.rsvp_event", return_value=PARTICIPATION_DATA):
-                response = self._make_request()
+                with patch("app.api.v1.events.person_service.get_or_create_person", return_value={"person_id": "pid-1", "first_name": "Test", "last_name": "User"}):
+                    with patch("app.api.v1.events.ticket_service.create_tickets"):
+                        response = self._make_request()
 
-                assert response.status_code == 200
-                data = response.json()
-                assert data["status"] == "Accepted"
-                assert data["event_id"] == EVENT_ID
-                assert data["event_participation_id"] == PARTICIPATION_ID
+                        assert response.status_code == 200
+                        data = response.json()
+                        assert data["status"] == "Accepted"
+                        assert data["event_id"] == EVENT_ID
+                        assert data["event_participation_id"] == PARTICIPATION_ID
 
     def test_returns_403_without_token(self):
         response = self._make_request(token=None)
