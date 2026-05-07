@@ -36,7 +36,7 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
         .select(
             "*, location(*), event_media(media_url), "
             "event_host(person_id), "
-            "event_participation(event_participation_id)"
+            "ticket(ticket_id)"
         )
         .eq("is_public", True)
         .eq("status", "published")
@@ -82,7 +82,8 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
         .select(
             "*, location(*), event_media(media_url), ticket_option(*), "
             "event_host(person(person_id, supabase_user_id, first_name, last_name)), "
-            "event_participation(event_participation_id, status, person(person_id, supabase_user_id))"
+            "event_participation(event_participation_id, status, person(person_id, supabase_user_id)), "
+            "ticket(ticket_id)"
         )
         .eq("event_id", event_id)
         .maybe_single()

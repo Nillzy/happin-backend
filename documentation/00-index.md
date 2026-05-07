@@ -22,6 +22,7 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [14-rsvp-and-event-host.md](14-rsvp-and-event-host.md) | RSVP-Funktion & event_host-Refactoring: DB-Migration, RSVP-Endpoint, RPC, is_host/my_rsvp_status (M5) |
 | [15-user-account-api.md](15-user-account-api.md) | User-Account-API: Stats, eigene Events, Tickets, Name-Update, Konto-Löschung, Timestamp-Konvention |
 | [16-infinity-scroll-pagination.md](16-infinity-scroll-pagination.md) | Infinity Scroll Backend-Fix: Total-Count statt Page-Count, Tuple-Return, Separate Count-Query |
+| [17-ticket-system.md](17-ticket-system.md) | Ticket-System: Automatische Generierung bei RSVP, QR-Token, DB-Schema, Endpoints (M8) |
 
 ## Neue Dokumentation hinzufügen
 

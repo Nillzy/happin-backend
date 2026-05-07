@@ -31,7 +31,7 @@ async def get_user_tickets(user=Depends(get_current_user), token: str = Depends(
     supabase_user_id = user.user.id
     email = user.user.email
     person = person_service.get_or_create_person(supabase_user_id, email, token)
-    result = user_service.get_user_tickets(person["person_id"])
+    result = user_service.get_user_tickets(person["person_id"], token)
     return TicketListResponse(**result)
 
 

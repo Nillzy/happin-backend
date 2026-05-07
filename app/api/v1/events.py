@@ -22,6 +22,7 @@ from app.schemas.participants import (
 from app.services import event_service
 from app.services import person_service
 from app.services import user_service
+from app.services import ticket_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -33,8 +34,8 @@ def _to_list_item(raw: dict) -> EventListItem:
     media = raw.get("event_media") or []
     image_url = media[0]["media_url"] if media else None
 
-    participations = raw.get("event_participation") or []
-    participant_count = len(participations)
+    tickets = raw.get("ticket") or []
+    participant_count = len(tickets)
 
     return EventListItem(
         event_id=raw["event_id"],
@@ -115,8 +116,8 @@ def _to_detail(raw: dict) -> EventDetailResponse:
     media_urls = [m["media_url"] for m in media]
     image_url = media_urls[0] if media_urls else None
 
-    participations = raw.get("event_participation") or []
-    participant_count = len(participations)
+    tickets = raw.get("ticket") or []
+    participant_count = len(tickets)
 
     hosts = raw.get("event_host") or []
     host_name = None
@@ -252,6 +253,19 @@ async def rsvp_to_event(
             status=body.status,
             token=credentials.credentials,
         )
+
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        person_id = person["person_id"]
+
+        if body.status == "Accepted":
+            ticket_service.create_tickets(event_id=event_id, person_id=person_id, token=credentials.credentials)
+        elif body.status == "Declined":
+            ticket_service.delete_tickets_for_event(event_id=event_id, person_id=person_id, token=credentials.credentials)
+
         return RsvpResponse(**raw)
     except ValueError as e:
         code, detail = _RSVP_STATUS_ERRORS.get(str(e), (400, str(e)))

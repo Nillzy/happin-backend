@@ -76,7 +76,7 @@ def get_user_events(
         if host_event_ids:
             query = (
                 supabase.table("event")
-                .select("*, location(*), event_media(media_url), event_host(person_id), event_participation(event_participation_id)")
+                .select("*, location(*), event_media(media_url), event_host(person_id), ticket(ticket_id)")
                 .in_("event_id", host_event_ids)
             )
             if period == "upcoming":
@@ -90,11 +90,12 @@ def get_user_events(
             events.extend(result.data or [])
 
     if role in (None, "attendee"):
-        # Events where user is a participant (not host)
+        # Events where user is a participant (not host) — only accepted
         part_rows = (
             supabase.table("event_participation")
             .select("event_id")
             .eq("person_id", person_id)
+            .eq("status", "Accepted")
             .execute()
         )
         attendee_event_ids = [r["event_id"] for r in (part_rows.data or [])]
@@ -102,7 +103,7 @@ def get_user_events(
         if attendee_event_ids:
             query = (
                 supabase.table("event")
-                .select("*, location(*), event_media(media_url), event_host(person_id), event_participation(event_participation_id)")
+                .select("*, location(*), event_media(media_url), event_host(person_id), ticket(ticket_id)")
                 .in_("event_id", attendee_event_ids)
             )
             if period == "upcoming":
@@ -129,42 +130,10 @@ def get_user_events(
     return unique[offset: offset + limit]
 
 
-def get_user_tickets(person_id: str) -> dict:
-    """
-    Returns participations as tickets (no separate ticket purchase table exists yet).
-    Joins event and ticket_option for display data.
-    """
-    supabase = get_supabase()
-
-    response = (
-        supabase.table("event_participation")
-        .select(
-            "event_participation_id, status, created_at, "
-            "event(event_id, title, ticket_option(ticket_option_id, name, price))"
-        )
-        .eq("person_id", person_id)
-        .order("created_at", desc=True)
-        .execute()
-    )
-
-    rows = response.data or []
-    tickets = []
-    for row in rows:
-        event = row.get("event") or {}
-        options = event.get("ticket_option") or []
-        option = options[0] if options else {}
-        tickets.append({
-            "ticket_id": row["event_participation_id"],
-            "event_id": event.get("event_id", ""),
-            "event_title": event.get("title", ""),
-            "ticket_option_name": option.get("name", "Standard"),
-            "price": float(option.get("price", 0.0)),
-            "currency": "EUR",
-            "status": row.get("status", "active"),
-            "purchased_at": row.get("created_at"),
-        })
-
-    return {"tickets": tickets, "total": len(tickets)}
+def get_user_tickets(person_id: str, token: str) -> dict:
+    """Returns tickets from the ticket table with event and option details."""
+    from app.services import ticket_service
+    return ticket_service.get_tickets_for_person(person_id, token)
 
 
 def delete_user(supabase_user_id: str, token: str) -> None:

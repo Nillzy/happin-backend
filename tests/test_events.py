@@ -53,6 +53,9 @@ MOCK_EVENT_RAW = {
         },
     ],
     "ticket_option": [],
+    "ticket": [
+        {"ticket_id": "t1234567-abcd-efgh-ijkl-000000000001"},
+    ],
 }
 
 
