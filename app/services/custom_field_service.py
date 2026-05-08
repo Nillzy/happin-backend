@@ -64,46 +64,67 @@ def sync_custom_fields(event_id: str, fields: list[dict], token: str) -> list[di
     return get_custom_fields(event_id)
 
 
-def submit_responses(
-    event_participation_id: str, responses: list[dict], token: str
-) -> list[dict]:
-    """UPSERT guest responses for a participation (one per custom_field)."""
+def submit_responses(ticket_id: str, responses: list[dict], token: str) -> list[dict]:
+    """UPSERT guest responses for a ticket (one per custom_field)."""
     supabase = get_supabase_for_user(token)
 
     for resp in responses:
         row = {
-            "event_participation_id": event_participation_id,
+            "ticket_id": ticket_id,
             "custom_field_id": resp["custom_field_id"],
             "value": resp["value"],
-            "updated_at": "now()",
         }
         supabase.table("custom_field_response").upsert(
-            row, on_conflict="event_participation_id,custom_field_id"
+            row, on_conflict="ticket_id,custom_field_id"
         ).execute()
 
-    return get_responses_for_participation(event_participation_id, token)
+    return get_responses_for_ticket(ticket_id, token)
 
 
-def get_responses_for_participation(
-    event_participation_id: str, token: str
-) -> list[dict]:
+def get_responses_for_ticket(ticket_id: str, token: str) -> list[dict]:
+    """Get all custom field responses for a specific ticket."""
     supabase = get_supabase_for_user(token)
     response = (
         supabase.table("custom_field_response")
-        .select("*")
-        .eq("event_participation_id", event_participation_id)
+        .select("custom_field_id, value")
+        .eq("ticket_id", ticket_id)
         .execute()
     )
     return response.data
 
 
+def get_my_responses(event_id: str, person_id: str, token: str) -> list[dict]:
+    """Get all custom field responses for the current user's tickets at an event."""
+    supabase = get_supabase_for_user(token)
+    tickets = (
+        supabase.table("ticket")
+        .select("ticket_id")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .execute()
+    )
+    result = []
+    for t in (tickets.data or []):
+        responses = (
+            supabase.table("custom_field_response")
+            .select("custom_field_id, value")
+            .eq("ticket_id", t["ticket_id"])
+            .execute()
+        )
+        result.append({
+            "ticket_id": t["ticket_id"],
+            "responses": responses.data or [],
+        })
+    return result
+
+
 def get_all_responses_for_event(event_id: str, token: str) -> list[dict]:
-    """Fetch all custom field responses for an event (host view)."""
+    """Fetch all custom field responses for an event (host view), grouped by ticket."""
     supabase = get_supabase_for_user(token)
     response = (
         supabase.table("custom_field_response")
-        .select("*, event_participation!inner(event_id, person_id)")
-        .eq("event_participation.event_id", event_id)
+        .select("ticket_id, custom_field_id, value, ticket!inner(event_id)")
+        .eq("ticket.event_id", event_id)
         .execute()
     )
     return response.data

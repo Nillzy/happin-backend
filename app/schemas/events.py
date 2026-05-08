@@ -33,6 +33,7 @@ class EventCreate(BaseModel):
     description: str | None = None
     category: str | None = None
     max_capacity: int | None = None
+    max_tickets_per_person: int | None = 1
     is_public: bool
     is_free: bool = True
     location: LocationCreate
@@ -55,6 +56,13 @@ class EventCreate(BaseModel):
     def capacity_positive(cls, v: int | None) -> int | None:
         if v is not None and v <= 0:
             raise ValueError("max_capacity must be greater than 0")
+        return v
+
+    @field_validator("max_tickets_per_person")
+    @classmethod
+    def tickets_per_person_positive(cls, v: int | None) -> int | None:
+        if v is not None and v <= 0:
+            raise ValueError("max_tickets_per_person must be greater than 0")
         return v
 
     @field_validator("status")
@@ -80,6 +88,7 @@ class EventUpdate(BaseModel):
     description: str | None = None
     category: str | None = None
     max_capacity: int | None = None
+    max_tickets_per_person: int | None = None
     is_public: bool | None = None
     is_free: bool | None = None
     status: str | None = None
@@ -138,6 +147,7 @@ class EventListItem(BaseModel):
     description: str | None = None
     category: str | None = None
     max_capacity: int | None = None
+    max_tickets_per_person: int | None = 1
     is_public: bool
     is_free: bool = True
     status: str = "published"
@@ -162,10 +172,12 @@ class EventDetailResponse(EventListItem):
     ticket_options: list[TicketOptionResponse] = []
     custom_fields: list[CustomFieldResponse] = []
     my_rsvp_status: Optional[str] = None
+    ticket: list[dict] = []
 
 
 class RsvpRequest(BaseModel):
     status: Literal['Accepted', 'Declined', 'Pending']
+    ticket_count: int = 1
 
 
 class RsvpResponse(BaseModel):

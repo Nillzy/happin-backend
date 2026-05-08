@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from typing import Any
 
 
 class PersonInfo(BaseModel):
@@ -13,6 +14,16 @@ class PersonInfo(BaseModel):
     phone_number: str | None = None
 
 
+class CustomFieldResponseItem(BaseModel):
+    custom_field_id: str
+    value: Any
+
+
+class TicketResponsesItem(BaseModel):
+    ticket_id: str
+    responses: list[CustomFieldResponseItem] = []
+
+
 class ParticipantResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -21,6 +32,8 @@ class ParticipantResponse(BaseModel):
     status: str
     ticket_count: int = 0
     created_at: datetime | None = None
+    custom_field_responses: list[CustomFieldResponseItem] = []
+    ticket_responses: list[TicketResponsesItem] = []
 
 
 class ParticipantCounts(BaseModel):

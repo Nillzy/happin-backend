@@ -83,7 +83,7 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
             "*, location(*), event_media(media_url), ticket_option(*), "
             "event_host(person(person_id, supabase_user_id, first_name, last_name)), "
             "event_participation(event_participation_id, status, person(person_id, supabase_user_id)), "
-            "ticket(ticket_id), custom_field(*)"
+            "ticket(ticket_id, person_id), custom_field(*)"
         )
         .eq("event_id", event_id)
         .maybe_single()
@@ -109,9 +109,19 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
             h.get("person", {}).get("supabase_user_id") == supabase_user_id
             for h in hosts
         )
+
+        my_person_id = None
+        if my_participation:
+            my_person_id = my_participation.get("person", {}).get("person_id")
+        all_tickets = data.get("ticket") or []
+        data["my_tickets"] = [
+            {"ticket_id": t["ticket_id"]} for t in all_tickets
+            if t.get("person_id") == my_person_id
+        ] if my_person_id else []
     else:
         data["my_rsvp_status"] = None
         data["is_host"] = False
+        data["my_tickets"] = []
 
     return data
 
@@ -347,7 +357,10 @@ def get_event_participants(event_id: str, token: str) -> dict:
 
     response = (
         supabase.table("event_participation")
-        .select("event_participation_id, status, created_at, person(person_id, first_name, last_name, phone_number)")
+        .select(
+            "event_participation_id, status, created_at, "
+            "person(person_id, first_name, last_name, phone_number)"
+        )
         .eq("event_id", event_id)
         .execute()
     )
@@ -356,16 +369,25 @@ def get_event_participants(event_id: str, token: str) -> dict:
 
     ticket_response = (
         supabase.table("ticket")
-        .select("ticket_id, person_id")
+        .select("ticket_id, person_id, custom_field_response(custom_field_id, value)")
         .eq("event_id", event_id)
         .execute()
     )
     tickets = ticket_response.data or []
 
     ticket_counts_by_person: dict[str, int] = {}
+    responses_by_person: dict[str, list] = {}
     for t in tickets:
         pid = t["person_id"]
         ticket_counts_by_person[pid] = ticket_counts_by_person.get(pid, 0) + 1
+        ticket_responses = t.get("custom_field_response") or []
+        if ticket_responses:
+            if pid not in responses_by_person:
+                responses_by_person[pid] = []
+            responses_by_person[pid].append({
+                "ticket_id": t["ticket_id"],
+                "responses": ticket_responses,
+            })
 
     counts = {"accepted": len(tickets), "declined": 0, "pending": 0}
     for p in participants:
@@ -376,6 +398,7 @@ def get_event_participants(event_id: str, token: str) -> dict:
             counts["pending"] += 1
         person_id = p.get("person", {}).get("person_id")
         p["ticket_count"] = ticket_counts_by_person.get(person_id, 0) if person_id else 0
+        p["ticket_responses"] = responses_by_person.get(person_id, []) if person_id else []
 
     return {
         "participants": participants,
@@ -391,6 +414,15 @@ def remove_participants(event_id: str, participation_ids: list[str], token: str 
     else:
         client = get_supabase()
 
+    participations = (
+        client.table("event_participation")
+        .select("event_participation_id, person_id")
+        .eq("event_id", event_id)
+        .in_("event_participation_id", participation_ids)
+        .execute()
+    )
+    person_ids = [p["person_id"] for p in (participations.data or [])]
+
     response = (
         client.table("event_participation")
         .delete()
@@ -398,5 +430,8 @@ def remove_participants(event_id: str, participation_ids: list[str], token: str 
         .in_("event_participation_id", participation_ids)
         .execute()
     )
+
+    for pid in person_ids:
+        client.table("ticket").delete().eq("event_id", event_id).eq("person_id", pid).execute()
 
     return len(response.data) if response.data else 0
