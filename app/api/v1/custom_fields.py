@@ -1,0 +1,180 @@
+"""Custom field endpoints — form definitions + guest responses."""
+
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer
+
+from app.core.auth import get_current_user, get_current_user_optional
+from app.schemas.custom_fields import (
+    CustomFieldSyncRequest,
+    CustomFieldResponse,
+    CustomFieldResponseSubmit,
+    CustomFieldResponseOut,
+)
+from app.services import custom_field_service, person_service, event_service
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _verify_host(event_id: str, person_id: str) -> None:
+    if not event_service.is_user_host(event_id, person_id):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+
+@router.get("/{event_id}/custom-fields", response_model=list[CustomFieldResponse])
+async def get_custom_fields(
+    event_id: str,
+    user=Depends(get_current_user_optional),
+):
+    try:
+        result = custom_field_service.get_custom_fields(event_id)
+        return [CustomFieldResponse(**row) for row in result]
+    except Exception as e:
+        logger.exception("Get custom fields error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{event_id}/custom-fields", response_model=list[CustomFieldResponse])
+async def sync_custom_fields(
+    event_id: str,
+    body: CustomFieldSyncRequest,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    try:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        _verify_host(event_id, person["person_id"])
+
+        fields_data = [f.model_dump() for f in body.custom_fields]
+        result = custom_field_service.sync_custom_fields(
+            event_id, fields_data, credentials.credentials
+        )
+        return [CustomFieldResponse(**row) for row in result]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Custom fields sync error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{event_id}/custom-fields/responses",
+    response_model=list[CustomFieldResponseOut],
+)
+async def submit_responses(
+    event_id: str,
+    body: CustomFieldResponseSubmit,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    try:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        person_id = person["person_id"]
+
+        from app.core.supabase import get_supabase_for_user
+
+        supabase = get_supabase_for_user(credentials.credentials)
+        participation = (
+            supabase.table("event_participation")
+            .select("event_participation_id")
+            .eq("event_id", event_id)
+            .eq("person_id", person_id)
+            .maybe_single()
+            .execute()
+        )
+        if not participation.data:
+            raise HTTPException(
+                status_code=400, detail="Must RSVP before submitting responses"
+            )
+
+        event_participation_id = participation.data["event_participation_id"]
+        responses_data = [r.model_dump() for r in body.responses]
+        result = custom_field_service.submit_responses(
+            event_participation_id, responses_data, credentials.credentials
+        )
+        return [CustomFieldResponseOut(**row) for row in result]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Submit responses error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/{event_id}/custom-fields/responses/me",
+    response_model=list[CustomFieldResponseOut],
+)
+async def get_my_responses(
+    event_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    try:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        person_id = person["person_id"]
+
+        from app.core.supabase import get_supabase_for_user
+
+        supabase = get_supabase_for_user(credentials.credentials)
+        participation = (
+            supabase.table("event_participation")
+            .select("event_participation_id")
+            .eq("event_id", event_id)
+            .eq("person_id", person_id)
+            .maybe_single()
+            .execute()
+        )
+        if not participation.data:
+            return []
+
+        result = custom_field_service.get_responses_for_participation(
+            participation.data["event_participation_id"], credentials.credentials
+        )
+        return [CustomFieldResponseOut(**row) for row in result]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Get my responses error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/{event_id}/custom-fields/responses",
+    response_model=list[CustomFieldResponseOut],
+)
+async def get_all_responses(
+    event_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    try:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        _verify_host(event_id, person["person_id"])
+
+        result = custom_field_service.get_all_responses_for_event(
+            event_id, credentials.credentials
+        )
+        return [CustomFieldResponseOut(**row) for row in result]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Get all responses error")
+        raise HTTPException(status_code=500, detail=str(e))
