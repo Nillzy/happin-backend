@@ -51,10 +51,16 @@ class CustomFieldResponseItem(BaseModel):
 
 
 class CustomFieldResponseSubmit(BaseModel):
+    ticket_id: str
     responses: list[CustomFieldResponseItem]
 
 
 class CustomFieldResponseOut(BaseModel):
-    event_participation_id: str
+    ticket_id: str
     custom_field_id: str
     value: str | list[str]
+
+
+class TicketResponsesOut(BaseModel):
+    ticket_id: str
+    responses: list[CustomFieldResponseItem]

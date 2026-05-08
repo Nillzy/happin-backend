@@ -18,6 +18,8 @@ from app.schemas.participants import (
     ParticipantResponse,
     PersonInfo,
     ParticipantCounts,
+    CustomFieldResponseItem,
+    TicketResponsesItem,
     RemoveParticipantsRequest,
     RemoveParticipantsResponse,
 )
@@ -47,6 +49,7 @@ def _to_list_item(raw: dict) -> EventListItem:
         description=raw.get("description"),
         category=raw.get("category"),
         max_capacity=raw.get("max_capacity"),
+        max_tickets_per_person=raw.get("max_tickets_per_person", 1),
         is_public=raw["is_public"],
         is_free=raw.get("is_free", True),
         status=raw.get("status", "published"),
@@ -136,6 +139,7 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         description=raw.get("description"),
         category=raw.get("category"),
         max_capacity=raw.get("max_capacity"),
+        max_tickets_per_person=raw.get("max_tickets_per_person", 1),
         is_public=raw["is_public"],
         is_free=raw.get("is_free", True),
         status=raw.get("status", "published"),
@@ -158,6 +162,7 @@ def _to_detail(raw: dict) -> EventDetailResponse:
             for f in (raw.get("custom_field") or [])
         ],
         my_rsvp_status=raw.get("my_rsvp_status"),
+        ticket=raw.get("my_tickets") or [],
     )
 
 
@@ -271,11 +276,28 @@ async def rsvp_to_event(
         ).strip() or None
 
         if body.status == "Accepted":
+            from app.core.supabase import get_supabase_for_user
+            supabase = get_supabase_for_user(credentials.credentials)
+            max_per_person = 1
+            try:
+                event_row = (
+                    supabase.table("event")
+                    .select("max_tickets_per_person")
+                    .eq("event_id", event_id)
+                    .single()
+                    .execute()
+                )
+                max_per_person = (event_row.data or {}).get("max_tickets_per_person") or 1
+            except Exception:
+                pass
+            ticket_count = min(body.ticket_count, max_per_person)
+
             ticket_service.create_tickets(
                 event_id=event_id,
                 person_id=person_id,
                 token=credentials.credentials,
                 guest_name=guest_name,
+                quantity=ticket_count,
             )
         elif body.status == "Declined":
             ticket_service.delete_tickets_for_event(event_id=event_id, person_id=person_id, token=credentials.credentials)
@@ -322,6 +344,27 @@ async def get_participants(
             status=p["status"],
             ticket_count=p.get("ticket_count", 0),
             created_at=p.get("created_at"),
+            custom_field_responses=[
+                CustomFieldResponseItem(
+                    custom_field_id=r["custom_field_id"],
+                    value=r["value"],
+                )
+                for tr in (p.get("ticket_responses") or [])
+                for r in tr.get("responses", [])
+            ],
+            ticket_responses=[
+                TicketResponsesItem(
+                    ticket_id=tr["ticket_id"],
+                    responses=[
+                        CustomFieldResponseItem(
+                            custom_field_id=r["custom_field_id"],
+                            value=r["value"],
+                        )
+                        for r in tr.get("responses", [])
+                    ],
+                )
+                for tr in (p.get("ticket_responses") or [])
+            ],
         )
         for p in data["participants"]
     ]

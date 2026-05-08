@@ -34,8 +34,11 @@ def create_tickets(
         .execute()
     ).count or 0
 
+    if existing_count >= quantity:
+        return []
+
     payloads = []
-    for i in range(quantity):
+    for i in range(quantity - existing_count):
         ticket_nr = existing_count + i + 1
         qr_token = generate_ticket_token(event_id, guest_name, ticket_nr, ticket_option_name)
         payload: dict = {

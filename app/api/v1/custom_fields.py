@@ -10,7 +10,8 @@ from app.schemas.custom_fields import (
     CustomFieldSyncRequest,
     CustomFieldResponse,
     CustomFieldResponseSubmit,
-    CustomFieldResponseOut,
+    CustomFieldResponseItem,
+    TicketResponsesOut,
 )
 from app.services import custom_field_service, person_service, event_service
 
@@ -65,7 +66,7 @@ async def sync_custom_fields(
 
 @router.post(
     "/{event_id}/custom-fields/responses",
-    response_model=list[CustomFieldResponseOut],
+    response_model=list[CustomFieldResponseItem],
 )
 async def submit_responses(
     event_id: str,
@@ -84,25 +85,25 @@ async def submit_responses(
         from app.core.supabase import get_supabase_for_user
 
         supabase = get_supabase_for_user(credentials.credentials)
-        participation = (
-            supabase.table("event_participation")
-            .select("event_participation_id")
+        ticket = (
+            supabase.table("ticket")
+            .select("ticket_id")
+            .eq("ticket_id", body.ticket_id)
             .eq("event_id", event_id)
             .eq("person_id", person_id)
             .maybe_single()
             .execute()
         )
-        if not participation.data:
+        if not ticket.data:
             raise HTTPException(
-                status_code=400, detail="Must RSVP before submitting responses"
+                status_code=400, detail="Ticket not found or does not belong to you"
             )
 
-        event_participation_id = participation.data["event_participation_id"]
         responses_data = [r.model_dump() for r in body.responses]
         result = custom_field_service.submit_responses(
-            event_participation_id, responses_data, credentials.credentials
+            body.ticket_id, responses_data, credentials.credentials
         )
-        return [CustomFieldResponseOut(**row) for row in result]
+        return [CustomFieldResponseItem(**row) for row in result]
     except HTTPException:
         raise
     except Exception as e:
@@ -112,7 +113,7 @@ async def submit_responses(
 
 @router.get(
     "/{event_id}/custom-fields/responses/me",
-    response_model=list[CustomFieldResponseOut],
+    response_model=list[TicketResponsesOut],
 )
 async def get_my_responses(
     event_id: str,
@@ -127,54 +128,18 @@ async def get_my_responses(
         )
         person_id = person["person_id"]
 
-        from app.core.supabase import get_supabase_for_user
-
-        supabase = get_supabase_for_user(credentials.credentials)
-        participation = (
-            supabase.table("event_participation")
-            .select("event_participation_id")
-            .eq("event_id", event_id)
-            .eq("person_id", person_id)
-            .maybe_single()
-            .execute()
+        result = custom_field_service.get_my_responses(
+            event_id, person_id, credentials.credentials
         )
-        if not participation.data:
-            return []
-
-        result = custom_field_service.get_responses_for_participation(
-            participation.data["event_participation_id"], credentials.credentials
-        )
-        return [CustomFieldResponseOut(**row) for row in result]
+        return [
+            TicketResponsesOut(
+                ticket_id=item["ticket_id"],
+                responses=[CustomFieldResponseItem(**r) for r in item["responses"]],
+            )
+            for item in result
+        ]
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Get my responses error")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get(
-    "/{event_id}/custom-fields/responses",
-    response_model=list[CustomFieldResponseOut],
-)
-async def get_all_responses(
-    event_id: str,
-    user=Depends(get_current_user),
-    credentials=Depends(HTTPBearer()),
-):
-    try:
-        person = person_service.get_or_create_person(
-            supabase_user_id=user.user.id,
-            email=user.user.email,
-            token=credentials.credentials,
-        )
-        _verify_host(event_id, person["person_id"])
-
-        result = custom_field_service.get_all_responses_for_event(
-            event_id, credentials.credentials
-        )
-        return [CustomFieldResponseOut(**row) for row in result]
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Get all responses error")
         raise HTTPException(status_code=500, detail=str(e))
