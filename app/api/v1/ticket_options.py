@@ -17,16 +17,15 @@ logger = logging.getLogger(__name__)
 def _verify_host(event_id: str, person_id: str, token: str) -> None:
     """Raise 403 if the person is not the host of the event."""
     supabase = get_supabase_for_user(token)
-    participation = (
-        supabase.table("event_participation")
-        .select("event_participation_id")
+    host_entry = (
+        supabase.table("event_host")
+        .select("event_host_id")
         .eq("event_id", event_id)
         .eq("person_id", person_id)
-        .eq("role", "Host")
         .maybe_single()
         .execute()
     )
-    if not participation.data:
+    if not host_entry.data:
         raise HTTPException(status_code=403, detail="Not authorized")
 
 

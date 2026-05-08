@@ -85,6 +85,7 @@ class EventUpdate(BaseModel):
     location: LocationUpdate | None = None
     image_url: str | None = None
     gradient_id: int | None = None
+    media_urls: list[str] | None = None
 
     @field_validator("title")
     @classmethod
