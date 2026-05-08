@@ -213,7 +213,37 @@ def update_event(event_id: str, data: dict, person_id: str, token: str, supabase
 
     has_image_url_field = "image_url" in data
     image_url = data.pop("image_url", None)
-    if has_image_url_field:
+    media_urls = data.pop("media_urls", None)  # None = not provided, [] = clear all
+
+    if media_urls is not None:
+        # Sync event_media rows using the user-scoped client (respects RLS)
+        existing_media = (
+            supabase.table("event_media")
+            .select("media_id, media_url")
+            .eq("event_id", event_id)
+            .order("media_id")
+            .execute()
+        )
+        existing_rows = existing_media.data or []
+
+        # Update existing rows in-place, insert new ones, delete surplus
+        for i, url in enumerate(media_urls):
+            if i < len(existing_rows):
+                supabase.table("event_media").update({"media_url": url}).eq(
+                    "media_id", existing_rows[i]["media_id"]
+                ).execute()
+            else:
+                supabase.table("event_media").insert(
+                    {"event_id": event_id, "media_url": url}
+                ).execute()
+
+        # Delete any surplus rows beyond the new list length
+        for row in existing_rows[len(media_urls):]:
+            supabase.table("event_media").delete().eq(
+                "media_id", row["media_id"]
+            ).execute()
+    elif has_image_url_field:
+        # Only the cover image changed — update/insert/delete the first media entry
         existing_media = (
             supabase.table("event_media")
             .select("media_id")
