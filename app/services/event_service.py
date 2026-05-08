@@ -83,7 +83,7 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
             "*, location(*), event_media(media_url), ticket_option(*), "
             "event_host(person(person_id, supabase_user_id, first_name, last_name)), "
             "event_participation(event_participation_id, status, person(person_id, supabase_user_id)), "
-            "ticket(ticket_id)"
+            "ticket(ticket_id), custom_field(*)"
         )
         .eq("event_id", event_id)
         .maybe_single()
