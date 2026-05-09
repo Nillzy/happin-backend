@@ -291,12 +291,14 @@ async def rsvp_to_event(
             except Exception:
                 pass
             ticket_count = min(body.ticket_count, max_per_person)
+            print(f"[RSVP] guest_names from request: {body.guest_names}")
 
             ticket_service.create_tickets(
                 event_id=event_id,
                 person_id=person_id,
                 token=credentials.credentials,
                 guest_name=guest_name,
+                guest_names=body.guest_names,
                 quantity=ticket_count,
             )
         elif body.status == "Declined":
@@ -355,6 +357,7 @@ async def get_participants(
             ticket_responses=[
                 TicketResponsesItem(
                     ticket_id=tr["ticket_id"],
+                    guest_name=tr.get("guest_name"),
                     responses=[
                         CustomFieldResponseItem(
                             custom_field_id=r["custom_field_id"],
