@@ -178,6 +178,7 @@ class EventDetailResponse(EventListItem):
 class RsvpRequest(BaseModel):
     status: Literal['Accepted', 'Declined', 'Pending']
     ticket_count: int = 1
+    guest_names: list[str] | None = None
 
 
 class RsvpResponse(BaseModel):

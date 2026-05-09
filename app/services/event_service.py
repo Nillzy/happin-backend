@@ -83,7 +83,7 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
             "*, location(*), event_media(media_url), ticket_option(*), "
             "event_host(person(person_id, supabase_user_id, first_name, last_name)), "
             "event_participation(event_participation_id, status, person(person_id, supabase_user_id)), "
-            "ticket(ticket_id, person_id), custom_field(*)"
+            "ticket(ticket_id, person_id, guest_name), custom_field(*)"
         )
         .eq("event_id", event_id)
         .maybe_single()
@@ -115,7 +115,8 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
             my_person_id = my_participation.get("person", {}).get("person_id")
         all_tickets = data.get("ticket") or []
         data["my_tickets"] = [
-            {"ticket_id": t["ticket_id"]} for t in all_tickets
+            {"ticket_id": t["ticket_id"], "guest_name": t.get("guest_name")}
+            for t in all_tickets
             if t.get("person_id") == my_person_id
         ] if my_person_id else []
     else:
@@ -369,7 +370,7 @@ def get_event_participants(event_id: str, token: str) -> dict:
 
     ticket_response = (
         supabase.table("ticket")
-        .select("ticket_id, person_id, custom_field_response(custom_field_id, value)")
+        .select("ticket_id, person_id, guest_name, custom_field_response(custom_field_id, value)")
         .eq("event_id", event_id)
         .execute()
     )
@@ -380,14 +381,13 @@ def get_event_participants(event_id: str, token: str) -> dict:
     for t in tickets:
         pid = t["person_id"]
         ticket_counts_by_person[pid] = ticket_counts_by_person.get(pid, 0) + 1
-        ticket_responses = t.get("custom_field_response") or []
-        if ticket_responses:
-            if pid not in responses_by_person:
-                responses_by_person[pid] = []
-            responses_by_person[pid].append({
-                "ticket_id": t["ticket_id"],
-                "responses": ticket_responses,
-            })
+        if pid not in responses_by_person:
+            responses_by_person[pid] = []
+        responses_by_person[pid].append({
+            "ticket_id": t["ticket_id"],
+            "guest_name": t.get("guest_name"),
+            "responses": t.get("custom_field_response") or [],
+        })
 
     counts = {"accepted": len(tickets), "declined": 0, "pending": 0}
     for p in participants:

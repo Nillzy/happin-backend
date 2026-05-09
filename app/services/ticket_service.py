@@ -11,6 +11,7 @@ def create_tickets(
     ticket_option_id: str | None = None,
     quantity: int = 1,
     guest_name: str | None = None,
+    guest_names: list[str] | None = None,
     ticket_option_name: str | None = None,
 ) -> list[dict]:
     """Create one or more tickets with HMAC-signed qr_tokens."""
@@ -26,13 +27,23 @@ def create_tickets(
         opt = supabase.table("ticket_option").select("name").eq("ticket_option_id", ticket_option_id).single().execute()
         ticket_option_name = (opt.data or {}).get("name")
 
-    existing_count = (
+    existing_resp = (
         supabase.table("ticket")
         .select("ticket_id", count="exact")
         .eq("event_id", event_id)
         .eq("person_id", person_id)
+        .order("created_at")
         .execute()
-    ).count or 0
+    )
+    existing_count = existing_resp.count or 0
+
+    # When names are provided, patch existing tickets so a re-RSVP updates names too.
+    if guest_names and existing_count > 0:
+        existing_ids = [r["ticket_id"] for r in (existing_resp.data or [])]
+        for i, tid in enumerate(existing_ids):
+            name = (guest_names[i].strip() if i < len(guest_names) else None) or guest_name or "Gast"
+            qr_token = generate_ticket_token(event_id, name, i + 1, ticket_option_name)
+            supabase.table("ticket").update({"guest_name": name, "qr_token": qr_token}).eq("ticket_id", tid).execute()
 
     if existing_count >= quantity:
         return []
@@ -40,17 +51,21 @@ def create_tickets(
     payloads = []
     for i in range(quantity - existing_count):
         ticket_nr = existing_count + i + 1
-        qr_token = generate_ticket_token(event_id, guest_name, ticket_nr, ticket_option_name)
+        name_idx = existing_count + i
+        name = (guest_names[name_idx] if guest_names and name_idx < len(guest_names) else guest_name) or "Gast"
+        qr_token = generate_ticket_token(event_id, name, ticket_nr, ticket_option_name)
         payload: dict = {
             "event_id": event_id,
             "person_id": person_id,
             "qr_token": qr_token,
+            "guest_name": name,
         }
         if ticket_option_id:
             payload["ticket_option_id"] = ticket_option_id
         payloads.append(payload)
 
     result = supabase.table("ticket").insert(payloads).execute()
+    print(f"[create_tickets] inserted {len(payloads)} tickets, data: {result.data}")
     return result.data
 
 
@@ -73,7 +88,7 @@ def get_tickets_for_person(person_id: str, token: str) -> dict:
     response = (
         supabase.table("ticket")
         .select(
-            "ticket_id, qr_token, status, created_at, used_at, "
+            "ticket_id, qr_token, status, created_at, used_at, guest_name, "
             "event(event_id, title, starts_at, location(city)), "
             "ticket_option(ticket_option_id, name, price)"
         )
@@ -91,6 +106,7 @@ def get_tickets_for_person(person_id: str, token: str) -> dict:
         tickets.append({
             "ticket_id": row["ticket_id"],
             "qr_token": row["qr_token"],
+            "guest_name": row.get("guest_name"),
             "event_id": event.get("event_id", ""),
             "event_title": event.get("title", ""),
             "starts_at": event.get("starts_at"),
