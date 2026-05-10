@@ -23,6 +23,8 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [15-user-account-api.md](15-user-account-api.md) | User-Account-API: Stats, eigene Events, Tickets, Name-Update, Konto-Löschung, Timestamp-Konvention |
 | [16-infinity-scroll-pagination.md](16-infinity-scroll-pagination.md) | Infinity Scroll Backend-Fix: Total-Count statt Page-Count, Tuple-Return, Separate Count-Query |
 | [17-ticket-system.md](17-ticket-system.md) | Ticket-System: Automatische Generierung bei RSVP, QR-Token, DB-Schema, Endpoints (M8) |
+| [18-calendar-export.md](17-calendar-export.md) | Kalenderexport (ICS): Endpoint, iCalendar-Format, Frontend-Integration |
+| [19-google-wallet.md](18-google-wallet.md) | Google Wallet: Event-Tickets als digitale Karten, JWT-Generierung, Service Account Setup |
 
 ## Neue Dokumentation hinzufügen
 

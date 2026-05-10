@@ -40,8 +40,8 @@ app = FastAPI(
 # TODO: Configure allowed origins based on environment in production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=["*"],  # Configure specific origins for production
+    allow_credentials=False,  # JWT via Authorization header, not cookies
     allow_methods=["*"],
     allow_headers=["*"],
 )

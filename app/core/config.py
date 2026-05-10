@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Ticket HMAC signing
     TICKET_SIGNING_KEY: str = ""
 
+    # Google Wallet
+    GOOGLE_WALLET_ISSUER_ID: str | None = None
+    GOOGLE_SERVICE_ACCOUNT_FILE: str | None = None
+
 
 # Global settings instance
 settings = Settings()
