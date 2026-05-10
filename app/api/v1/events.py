@@ -4,6 +4,7 @@ import logging
 
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.auth import get_current_user, get_current_user_optional
 from app.schemas.events import (
@@ -27,6 +28,8 @@ from app.services import event_service
 from app.services import person_service
 from app.services import user_service
 from app.services import ticket_service
+from app.services import calendar_service
+from app.services import google_wallet_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -433,3 +436,55 @@ async def scan_ticket(
         logger.error("Ticket update blocked by RLS: %s", e)
         raise HTTPException(status_code=500, detail="Ticket konnte nicht als verwendet markiert werden")
     return ScanTicketResponse(**result)
+
+
+@router.get("/{event_id}/calendar.ics")
+async def get_event_calendar(
+    event_id: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
+):
+    """
+    Generate an ICS calendar file for an event.
+
+    Returns a downloadable .ics file that can be imported into
+    Apple Calendar, Google Calendar, Outlook, etc.
+    """
+    token = credentials.credentials if credentials else None
+    ics_content = calendar_service.generate_ics(event_id, token)
+
+    if not ics_content:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    return Response(
+        content=ics_content,
+        media_type="text/calendar",
+        headers={
+            "Content-Disposition": f'attachment; filename="event-{event_id}.ics"'
+        },
+    )
+
+
+@router.get("/{event_id}/wallet")
+async def get_event_wallet_link(
+    event_id: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
+):
+    """
+    Generate a Google Wallet "Add to Wallet" link for an event.
+
+    Returns a URL that opens the Google Wallet app/website and adds
+    the event ticket to the user's wallet.
+    """
+    if not google_wallet_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Google Wallet integration not configured",
+        )
+
+    token = credentials.credentials if credentials else None
+    wallet_link = google_wallet_service.generate_wallet_link(event_id, token)
+
+    if not wallet_link:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    return {"wallet_url": wallet_link}

@@ -2,11 +2,17 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 pydantic-settings==2.1.0
+icalendar==5.0.13
 
 # Database & Auth
 supabase==2.29.0
 websockets>=13.0,<16
 email-validator>=2.0.0
+
+# Google Wallet
+google-auth==2.29.0
+PyJWT==2.10.1
+cryptography>=42.0.0
 
 # External APIs (optional - install as needed)
 # stripe==7.0.0
