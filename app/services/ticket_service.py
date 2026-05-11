@@ -48,6 +48,13 @@ def create_tickets(
         payloads.append(payload)
 
     result = supabase.table("ticket").insert(payloads).execute()
+
+    if ticket_option_id:
+        opt_row = supabase.table("ticket_option").select("quantity_limit").eq("ticket_option_id", ticket_option_id).single().execute()
+        current_limit = (opt_row.data or {}).get("quantity_limit")
+        if current_limit is not None:
+            supabase.table("ticket_option").update({"quantity_limit": max(0, current_limit - quantity)}).eq("ticket_option_id", ticket_option_id).execute()
+
     return result.data
 
 

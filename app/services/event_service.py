@@ -18,6 +18,7 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
     Returns (events, total_count) tuple.
     """
     supabase = get_supabase()
+    supabase_admin = get_supabase_admin()
 
     # Get total count (same filters as paginated query)
     count_response = (
@@ -47,6 +48,17 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
     )
 
     events = response.data if response.data else []
+    if not events:
+        return events, total_count
+
+    # Preise aller Ticketoptionen für diese Events via Admin-Client laden (umgeht RLS)
+    event_ids = [e["event_id"] for e in events]
+    opts_response = supabase_admin.table("ticket_option").select("event_id, price").in_("event_id", event_ids).execute()
+    paid_event_ids = {
+        row["event_id"]
+        for row in (opts_response.data or [])
+        if float(row.get("price", 0)) > 0
+    }
 
     for event in events:
         if person_id:
@@ -56,6 +68,8 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
             )
         else:
             event["is_host"] = False
+        if event["event_id"] in paid_event_ids:
+            event["is_free"] = False
 
     return events, total_count
 
@@ -112,6 +126,11 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
     else:
         data["my_rsvp_status"] = None
         data["is_host"] = False
+
+    # Wenn mind. eine Ticketoption mit Preis > 0 existiert, ist das Event nicht kostenlos
+    ticket_options = data.get("ticket_option") or []
+    if any(float(t.get("price", 0)) > 0 for t in ticket_options):
+        data["is_free"] = False
 
     return data
 
@@ -356,16 +375,32 @@ def get_event_participants(event_id: str, token: str) -> dict:
 
     ticket_response = (
         supabase.table("ticket")
-        .select("ticket_id, person_id")
+        .select("ticket_id, person_id, ticket_option(ticket_option_id, name, price)")
         .eq("event_id", event_id)
         .execute()
     )
     tickets = ticket_response.data or []
 
+    # Per-person: total count + breakdown by option
     ticket_counts_by_person: dict[str, int] = {}
+    ticket_options_by_person: dict[str, dict[str, int]] = {}  # person_id → {option_name → count}
+    option_summary: dict[str, dict] = {}  # option_name → {count, price}
+
     for t in tickets:
         pid = t["person_id"]
+        opt = t.get("ticket_option") or {}
+        opt_name = opt.get("name") or "Standard"
+        opt_price = float(opt.get("price", 0))
+
         ticket_counts_by_person[pid] = ticket_counts_by_person.get(pid, 0) + 1
+
+        if pid not in ticket_options_by_person:
+            ticket_options_by_person[pid] = {}
+        ticket_options_by_person[pid][opt_name] = ticket_options_by_person[pid].get(opt_name, 0) + 1
+
+        if opt_name not in option_summary:
+            option_summary[opt_name] = {"name": opt_name, "price": opt_price, "sold": 0}
+        option_summary[opt_name]["sold"] += 1
 
     counts = {"accepted": len(tickets), "declined": 0, "pending": 0}
     for p in participants:
@@ -375,11 +410,17 @@ def get_event_participants(event_id: str, token: str) -> dict:
         elif status == "pending":
             counts["pending"] += 1
         person_id = p.get("person", {}).get("person_id")
-        p["ticket_count"] = ticket_counts_by_person.get(person_id, 0) if person_id else 0
+        if person_id:
+            p["ticket_count"] = ticket_counts_by_person.get(person_id, 0)
+            p["ticket_options_bought"] = ticket_options_by_person.get(person_id, {})
+        else:
+            p["ticket_count"] = 0
+            p["ticket_options_bought"] = {}
 
     return {
         "participants": participants,
         "counts": counts,
+        "ticket_option_summary": list(option_summary.values()),
     }
 
 

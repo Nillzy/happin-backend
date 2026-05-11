@@ -145,6 +145,10 @@ class EventListItem(BaseModel):
     location: LocationResponse | None = None
     participant_count: int = 0
     is_host: bool = False
+    rsvp_accepted: int = 0
+    rsvp_declined: int = 0
+    waitlist_count: int = 0
+    ticket_revenue_cents: int = 0
 
 
 class EventListResponse(BaseModel):

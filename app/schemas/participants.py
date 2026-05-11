@@ -20,6 +20,7 @@ class ParticipantResponse(BaseModel):
     person: PersonInfo
     status: str
     ticket_count: int = 0
+    ticket_options_bought: dict[str, int] = {}
     created_at: datetime | None = None
 
 
@@ -29,9 +30,16 @@ class ParticipantCounts(BaseModel):
     pending: int = 0
 
 
+class TicketOptionSummary(BaseModel):
+    name: str
+    price: float
+    sold: int
+
+
 class ParticipantListResponse(BaseModel):
     participants: list[ParticipantResponse]
     counts: ParticipantCounts
+    ticket_option_summary: list[TicketOptionSummary] = []
 
 
 class RemoveParticipantsRequest(BaseModel):
