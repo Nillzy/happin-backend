@@ -128,6 +128,20 @@ def get_tickets_for_person(person_id: str, token: str) -> dict:
     return {"tickets": tickets, "total": len(tickets)}
 
 
+def get_tickets_for_event(event_id: str, person_id: str, token: str) -> list[dict]:
+    """Get all tickets for a person at a specific event."""
+    supabase = get_supabase_for_user(token)
+    response = (
+        supabase.table("ticket")
+        .select("ticket_id, qr_token, guest_name, status")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .order("created_at")
+        .execute()
+    )
+    return response.data or []
+
+
 def validate_ticket(event_id: str, qr_token: str, token: str) -> dict:
     """Validate and mark a ticket as used. Returns scan result dict."""
     from datetime import datetime, timezone
