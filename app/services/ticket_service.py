@@ -109,10 +109,14 @@ def get_tickets_for_person(person_id: str, token: str) -> dict:
         event = row.get("event") or {}
         option = row.get("ticket_option") or {}
         location = event.get("location") or {}
+        qr_token = row["qr_token"]
+        token_payload = verify_ticket_token(qr_token, event.get("event_id", ""))
+        ticket_number = token_payload.get("nr") if token_payload else None
         tickets.append({
             "ticket_id": row["ticket_id"],
-            "qr_token": row["qr_token"],
+            "qr_token": qr_token,
             "guest_name": row.get("guest_name"),
+            "ticket_number": ticket_number,
             "event_id": event.get("event_id", ""),
             "event_title": event.get("title", ""),
             "starts_at": event.get("starts_at"),
@@ -125,6 +129,7 @@ def get_tickets_for_person(person_id: str, token: str) -> dict:
             "used_at": row.get("used_at"),
         })
 
+    tickets.sort(key=lambda t: t["ticket_number"] or 0)
     return {"tickets": tickets, "total": len(tickets)}
 
 
