@@ -23,6 +23,8 @@ class UserStatsResponse(BaseModel):
 class TicketItem(BaseModel):
     ticket_id: str
     qr_token: str
+    guest_name: str | None = None
+    ticket_number: int | None = None
     event_id: str
     event_title: str
     starts_at: datetime | None = None
