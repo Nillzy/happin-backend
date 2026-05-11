@@ -76,7 +76,7 @@ def get_user_events(
         if host_event_ids:
             query = (
                 supabase.table("event")
-                .select("*, location(*), event_media(media_url), event_host(person_id), ticket(ticket_id)")
+                .select("*, location(*), event_media(media_url), event_host(person_id), ticket(ticket_id, ticket_option(price)), event_participation(status)")
                 .in_("event_id", host_event_ids)
             )
             if period == "upcoming":
@@ -85,8 +85,34 @@ def get_user_events(
                 query = query.lt("starts_at", now)
 
             result = query.order("starts_at", desc=(period == "past")).execute()
+
+            # Batch-load ticket_option prices to correctly flag paid events
+            result_event_ids = [e["event_id"] for e in (result.data or [])]
+            paid_event_ids: set[str] = set()
+            if result_event_ids:
+                opts_rows = (
+                    supabase.table("ticket_option")
+                    .select("event_id, price")
+                    .in_("event_id", result_event_ids)
+                    .execute()
+                )
+                paid_event_ids = {
+                    r["event_id"] for r in (opts_rows.data or [])
+                    if float(r.get("price", 0)) > 0
+                }
+
             for event in (result.data or []):
                 event["is_host"] = True
+                # Umsatz berechnen: Summe aller verkauften Tickets × Preis
+                tickets_sold = event.get("ticket", []) or []
+                revenue_cents = sum(
+                    int(float((t.get("ticket_option") or {}).get("price", 0)) * 100)
+                    for t in tickets_sold
+                    if t.get("ticket_option")
+                )
+                event["ticket_revenue_cents"] = revenue_cents
+                if event["event_id"] in paid_event_ids:
+                    event["is_free"] = False
             events.extend(result.data or [])
 
     if role in (None, "attendee"):
@@ -103,7 +129,7 @@ def get_user_events(
         if attendee_event_ids:
             query = (
                 supabase.table("event")
-                .select("*, location(*), event_media(media_url), event_host(person_id), ticket(ticket_id)")
+                .select("*, location(*), event_media(media_url), event_host(person_id), ticket(ticket_id), ticket_option(price)")
                 .in_("event_id", attendee_event_ids)
             )
             if period == "upcoming":
@@ -114,6 +140,9 @@ def get_user_events(
             result = query.order("starts_at", desc=(period == "past")).execute()
             for event in (result.data or []):
                 event["is_host"] = False
+                opts = event.pop("ticket_option", []) or []
+                if any(float(t.get("price", 0)) > 0 for t in opts):
+                    event["is_free"] = False
             events.extend(result.data or [])
 
     # Deduplicate (user can be both host and attendee edge case)
