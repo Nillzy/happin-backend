@@ -175,6 +175,8 @@ def _create_event_ticket_object(
     event_data: dict,
     object_id: str,
     class_id: str,
+    qr_token: str,
+    guest_name: str | None = None,
 ) -> dict:
     """Create a Google Wallet EventTicketObject payload.
 
@@ -190,10 +192,10 @@ def _create_event_ticket_object(
         "state": "ACTIVE",
         "barcode": {
             "type": "QR_CODE",
-            "value": f"happin:{event_data['event_id']}:{object_id}",
+            "value": qr_token,
             "alternateText": object_id[:8].upper(),
         },
-        "ticketHolderName": "Happin User",
+        "ticketHolderName": guest_name or "Happin User",
         "ticketNumber": object_id[:8].upper(),
         "textModulesData": [
             {
@@ -219,7 +221,12 @@ def _create_event_ticket_object(
     }
 
 
-def generate_wallet_link(event_id: str, token: str | None = None) -> str | None:
+def generate_wallet_link(
+    event_id: str,
+    token: str | None = None,
+    qr_token: str | None = None,
+    guest_name: str | None = None,
+) -> str | None:
     """
     Generate a Google Wallet "Add to Wallet" link for an event.
 
@@ -253,7 +260,11 @@ def generate_wallet_link(event_id: str, token: str | None = None) -> str | None:
     object_id = str(uuid.uuid4())
 
     ticket_class = _create_event_ticket_class(issuer_id, class_id, event_data)
-    ticket_object = _create_event_ticket_object(event_data, object_id, class_id)
+    ticket_object = _create_event_ticket_object(
+        event_data, object_id, class_id,
+        qr_token=qr_token or f"happin:{event_id}:{object_id}",
+        guest_name=guest_name,
+    )
 
     # origins must be empty for native app calls (non-web origin)
     claims = {

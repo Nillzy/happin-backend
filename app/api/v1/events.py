@@ -487,7 +487,8 @@ async def get_event_calendar(
 @router.get("/{event_id}/wallet")
 async def get_event_wallet_link(
     event_id: str,
-    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
 ):
     """
     Generate a Google Wallet "Add to Wallet" link for an event.
@@ -501,8 +502,26 @@ async def get_event_wallet_link(
             detail="Google Wallet integration not configured",
         )
 
-    token = credentials.credentials if credentials else None
-    wallet_link = google_wallet_service.generate_wallet_link(event_id, token)
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=credentials.credentials,
+    )
+    tickets = ticket_service.get_tickets_for_event(
+        event_id=event_id,
+        person_id=person["person_id"],
+        token=credentials.credentials,
+    )
+    if not tickets:
+        raise HTTPException(status_code=404, detail="Kein Ticket für dieses Event gefunden")
+
+    first_ticket = tickets[0]
+    wallet_link = google_wallet_service.generate_wallet_link(
+        event_id=event_id,
+        token=credentials.credentials,
+        qr_token=first_ticket["qr_token"],
+        guest_name=first_ticket.get("guest_name"),
+    )
 
     if not wallet_link:
         raise HTTPException(status_code=404, detail="Event not found")
