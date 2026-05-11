@@ -21,6 +21,7 @@ from app.schemas.participants import (
     ParticipantCounts,
     CustomFieldResponseItem,
     TicketResponsesItem,
+    TicketOptionSummary,
     RemoveParticipantsRequest,
     RemoveParticipantsResponse,
 )
@@ -44,6 +45,17 @@ def _to_list_item(raw: dict) -> EventListItem:
     tickets = raw.get("ticket") or []
     participant_count = len(tickets)
 
+    participations = raw.get("event_participation") or []
+    rsvp_accepted = sum(1 for p in participations if p.get("status") == "Accepted")
+    rsvp_declined = sum(1 for p in participations if p.get("status") == "Declined")
+    waitlist_count = sum(1 for p in participations if p.get("status") == "Pending")
+
+    revenue_cents = raw.get("ticket_revenue_cents") or sum(
+        int(float((t.get("ticket_option") or {}).get("price", 0)) * 100)
+        for t in tickets
+        if t.get("ticket_option")
+    )
+
     return EventListItem(
         event_id=raw["event_id"],
         title=raw["title"],
@@ -61,6 +73,10 @@ def _to_list_item(raw: dict) -> EventListItem:
         location=raw.get("location"),
         participant_count=participant_count,
         is_host=raw.get("is_host", False),
+        rsvp_accepted=rsvp_accepted,
+        rsvp_declined=rsvp_declined,
+        waitlist_count=waitlist_count,
+        ticket_revenue_cents=revenue_cents,
     )
 
 
@@ -348,6 +364,7 @@ async def get_participants(
             ),
             status=p["status"],
             ticket_count=p.get("ticket_count", 0),
+            ticket_options_bought=p.get("ticket_options_bought", {}),
             created_at=p.get("created_at"),
             custom_field_responses=[
                 CustomFieldResponseItem(
@@ -378,6 +395,9 @@ async def get_participants(
     return ParticipantListResponse(
         participants=participants,
         counts=ParticipantCounts(**data["counts"]),
+        ticket_option_summary=[
+            TicketOptionSummary(**s) for s in data.get("ticket_option_summary", [])
+        ],
     )
 
 
