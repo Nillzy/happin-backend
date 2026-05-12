@@ -12,27 +12,44 @@ def _isoformat(value) -> str:
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
 
 
-def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = None) -> tuple[list[dict], int]:
+def get_public_events(
+    limit: int = 50,
+    offset: int = 0,
+    person_id: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    categories: str | None = None,
+    city: str | None = None,
+    is_free: bool | None = None,
+) -> tuple[list[dict], int]:
     """
-    Get public events with pagination.
+    Get public events with optional filtering and pagination.
     Returns (events, total_count) tuple.
+
+    Filters applied at DB level: date_from, date_to, is_free.
+    Filters applied in Python post-fetch: city, categories (comma-separated OR logic).
     """
     supabase = get_supabase()
     supabase_admin = get_supabase_admin()
+    lower_bound = date_from if date_from else datetime.now(UTC).isoformat()
 
-    # Get total count (same filters as paginated query)
-    count_response = (
+    # Count query (same filters as paginated query, excluding pagination-only args)
+    count_q = (
         supabase.table("event")
         .select("event_id", count="exact")
         .eq("is_public", True)
         .eq("status", "published")
-        .gte("starts_at", datetime.now(UTC).isoformat())
-        .execute()
+        .gte("starts_at", lower_bound)
     )
-    total_count = count_response.count if hasattr(count_response, 'count') else 0
+    if date_to:
+        count_q = count_q.lte("starts_at", date_to)
+    if is_free is True:
+        count_q = count_q.eq("is_free", True)
+    count_response = count_q.execute()
+    total_count = count_response.count if hasattr(count_response, "count") else 0
 
-    # Get paginated events
-    response = (
+    # Paginated events query
+    q = (
         supabase.table("event")
         .select(
             "*, location(*), event_media(media_url), "
@@ -41,11 +58,14 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
         )
         .eq("is_public", True)
         .eq("status", "published")
-        .gte("starts_at", datetime.now(UTC).isoformat())
-        .order("starts_at", desc=False)
-        .range(offset, offset + limit - 1)
-        .execute()
+        .gte("starts_at", lower_bound)
     )
+    if date_to:
+        q = q.lte("starts_at", date_to)
+    if is_free is True:
+        q = q.eq("is_free", True)
+    q = q.order("starts_at", desc=False).range(offset, offset + limit - 1)
+    response = q.execute()
 
     events = response.data if response.data else []
     if not events:
@@ -59,6 +79,26 @@ def get_public_events(limit: int = 50, offset: int = 0, person_id: str | None = 
         for row in (opts_response.data or [])
         if float(row.get("price", 0)) > 0
     }
+
+    # Python post-fetch: city filter (case-insensitive)
+    if city:
+        city_lower = city.strip().lower()
+        events = [
+            e for e in events
+            if (e.get("location") or {}).get("city", "").lower() == city_lower
+        ]
+
+    # Python post-fetch: category filter (OR logic, partial match)
+    if categories:
+        cats = [c.strip().lower() for c in categories.split(",") if c.strip()]
+        if cats:
+            events = [
+                e for e in events
+                if any(
+                    cat in (e.get("category") or "").lower()
+                    for cat in cats
+                )
+            ]
 
     for event in events:
         if person_id:

@@ -84,10 +84,15 @@ def _to_list_item(raw: dict) -> EventListItem:
 async def list_public_events(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+    categories: Optional[str] = Query(default=None),
+    city: Optional[str] = Query(default=None),
+    is_free: Optional[bool] = Query(default=None),
     user=Depends(get_current_user_optional),
     credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
 ):
-    """List all public events with pagination."""
+    """List public events with optional filtering and pagination."""
     person_id = None
     if user and credentials:
         person = person_service.get_or_create_person(
@@ -97,7 +102,16 @@ async def list_public_events(
         )
         person_id = person["person_id"]
 
-    raw_events, total_count = event_service.get_public_events(limit=limit, offset=offset, person_id=person_id)
+    raw_events, total_count = event_service.get_public_events(
+        limit=limit,
+        offset=offset,
+        person_id=person_id,
+        date_from=date_from,
+        date_to=date_to,
+        categories=categories,
+        city=city,
+        is_free=is_free,
+    )
     events = [_to_list_item(e) for e in raw_events]
     return EventListResponse(events=events, count=total_count)
 

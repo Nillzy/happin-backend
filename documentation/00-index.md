@@ -25,6 +25,7 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [17-ticket-system.md](17-ticket-system.md) | Ticket-System: Automatische Generierung bei RSVP, QR-Token, DB-Schema, Endpoints (M8) |
 | [18-calendar-export.md](17-calendar-export.md) | Kalenderexport (ICS): Endpoint, iCalendar-Format, Frontend-Integration |
 | [19-google-wallet.md](18-google-wallet.md) | Google Wallet: Event-Tickets als digitale Karten, JWT-Generierung, Service Account Setup |
+| [19-events-filter.md](19-events-filter.md) | Events API filter parameters: date range, category, city, is_free |
 
 ## Neue Dokumentation hinzufügen
 

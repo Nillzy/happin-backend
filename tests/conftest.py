@@ -26,5 +26,5 @@ def client():
 @pytest.fixture
 def mock_supabase():
     """Reset and return the shared mock Supabase client."""
-    _mock_supabase.reset_mock()
+    _mock_supabase.reset_mock(side_effect=True, return_value=True)
     return _mock_supabase
