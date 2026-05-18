@@ -89,6 +89,7 @@ async def list_public_events(
     categories: Optional[str] = Query(default=None),
     city: Optional[str] = Query(default=None),
     is_free: Optional[bool] = Query(default=None),
+    search: Optional[str] = Query(default=None),
     user=Depends(get_current_user_optional),
     credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
 ):
@@ -111,6 +112,7 @@ async def list_public_events(
         categories=categories,
         city=city,
         is_free=is_free,
+        search=search,
     )
     events = [_to_list_item(e) for e in raw_events]
     return EventListResponse(events=events, count=total_count)
