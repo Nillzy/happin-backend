@@ -21,12 +21,13 @@ def get_public_events(
     categories: str | None = None,
     city: str | None = None,
     is_free: bool | None = None,
+    search: str | None = None,
 ) -> tuple[list[dict], int]:
     """
     Get public events with optional filtering and pagination.
     Returns (events, total_count) tuple.
 
-    Filters applied at DB level: date_from, date_to, is_free.
+    Filters applied at DB level: date_from, date_to, is_free, search (title ilike).
     Filters applied in Python post-fetch: city, categories (comma-separated OR logic).
     """
     supabase = get_supabase()
@@ -45,6 +46,9 @@ def get_public_events(
         count_q = count_q.lte("starts_at", date_to)
     if is_free is True:
         count_q = count_q.eq("is_free", True)
+    if search:
+        search_pattern = f"%{search.strip()}%".replace("%", "%25")
+        count_q = count_q.ilike("title", search_pattern)
     count_response = count_q.execute()
     total_count = count_response.count if hasattr(count_response, "count") else 0
 
@@ -64,6 +68,9 @@ def get_public_events(
         q = q.lte("starts_at", date_to)
     if is_free is True:
         q = q.eq("is_free", True)
+    if search:
+        search_pattern = f"%{search.strip()}%".replace("%", "%25")
+        q = q.ilike("title", search_pattern)
     q = q.order("starts_at", desc=False).range(offset, offset + limit - 1)
     response = q.execute()
 
