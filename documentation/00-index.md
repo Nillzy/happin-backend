@@ -26,6 +26,7 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [18-calendar-export.md](17-calendar-export.md) | Kalenderexport (ICS): Endpoint, iCalendar-Format, Frontend-Integration |
 | [19-google-wallet.md](18-google-wallet.md) | Google Wallet: Event-Tickets als digitale Karten, JWT-Generierung, Service Account Setup |
 | [19-events-filter.md](19-events-filter.md) | Events API filter parameters: date range, category, city, is_free |
+| [20-event-soft-delete.md](20-event-soft-delete.md) | Event Soft-Delete: `deleted_at`-Feld, Sichtbarkeitsregeln, DELETE-Endpoint |
 
 ## Neue Dokumentation hinzufügen
 

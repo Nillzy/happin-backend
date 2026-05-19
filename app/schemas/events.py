@@ -160,6 +160,8 @@ class EventListItem(BaseModel):
     rsvp_declined: int = 0
     waitlist_count: int = 0
     ticket_revenue_cents: int = 0
+    is_deleted: bool = False
+    deleted_at: datetime | None = None
 
 
 class EventListResponse(BaseModel):

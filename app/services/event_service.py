@@ -1,7 +1,7 @@
 """Event-related business logic and Supabase queries."""
 
 import secrets
-from datetime import datetime, timezone, UTC
+from datetime import datetime, timezone, UTC, timedelta
 
 from app.core.supabase import get_supabase, get_supabase_for_user, get_supabase_admin
 from app.services import person_service
@@ -41,6 +41,7 @@ def get_public_events(
         .eq("is_public", True)
         .eq("status", "published")
         .gte("starts_at", lower_bound)
+        .filter("deleted_at", "is", "null")
     )
     if date_to:
         count_q = count_q.lte("starts_at", date_to)
@@ -63,6 +64,7 @@ def get_public_events(
         .eq("is_public", True)
         .eq("status", "published")
         .gte("starts_at", lower_bound)
+        .filter("deleted_at", "is", "null")
     )
     if date_to:
         q = q.lte("starts_at", date_to)
@@ -129,6 +131,7 @@ def get_public_events_count() -> int:
         .eq("is_public", True)
         .eq("status", "published")
         .gte("starts_at", datetime.now(UTC).isoformat())
+        .filter("deleted_at", "is", "null")
         .execute()
     )
 
@@ -155,6 +158,30 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
         return None
 
     data = response.data
+
+    # Soft-delete visibility check
+    deleted_at_str = data.get("deleted_at")
+    if deleted_at_str:
+        deleted_at = datetime.fromisoformat(deleted_at_str.replace("Z", "+00:00"))
+        cutoff = deleted_at + timedelta(hours=48)
+        if datetime.now(UTC) >= cutoff:
+            return None  # 48h window expired — completely hidden
+
+        # Within 48h: only show to host or participant
+        if not supabase_user_id:
+            return None
+        hosts = data.get("event_host") or []
+        is_host_raw = any(
+            h.get("person", {}).get("supabase_user_id") == supabase_user_id
+            for h in hosts
+        )
+        participations = data.get("event_participation") or []
+        is_participant_raw = any(
+            p.get("person", {}).get("supabase_user_id") == supabase_user_id
+            for p in participations
+        )
+        if not is_host_raw and not is_participant_raw:
+            return None
 
     if supabase_user_id:
         participations = data.get("event_participation") or []
@@ -524,3 +551,47 @@ def remove_participants(event_id: str, participation_ids: list[str], token: str 
         client.table("ticket").delete().eq("event_id", event_id).eq("person_id", pid).execute()
 
     return len(response.data) if response.data else 0
+
+
+def delete_event(event_id: str, person_id: str, token: str) -> None:
+    """Soft-delete an event by setting deleted_at = now().
+
+    Raises PermissionError if caller is not the host.
+    Raises ValueError('event_not_found') if event does not exist.
+    Raises ValueError('already_deleted') if event is already deleted.
+    Raises ValueError('too_close_to_start') if starts_at - now() < 48h.
+    """
+    supabase = get_supabase_for_user(token)
+
+    host_entry = (
+        supabase.table("event_host")
+        .select("event_host_id")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .maybe_single()
+        .execute()
+    )
+    if not host_entry.data:
+        raise PermissionError("not_host")
+
+    event_row = (
+        supabase.table("event")
+        .select("starts_at, deleted_at")
+        .eq("event_id", event_id)
+        .maybe_single()
+        .execute()
+    )
+    if not event_row.data:
+        raise ValueError("event_not_found")
+
+    if event_row.data.get("deleted_at") is not None:
+        raise ValueError("already_deleted")
+
+    starts_at_str = event_row.data["starts_at"]
+    starts_at = datetime.fromisoformat(starts_at_str.replace("Z", "+00:00"))
+    if starts_at - datetime.now(UTC) < timedelta(hours=48):
+        raise ValueError("too_close_to_start")
+
+    supabase.table("event").update(
+        {"deleted_at": datetime.now(UTC).isoformat()}
+    ).eq("event_id", event_id).execute()

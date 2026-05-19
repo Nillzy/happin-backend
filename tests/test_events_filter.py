@@ -58,6 +58,7 @@ def _setup_flexible_chain(mock_supabase, data):
     chain.eq.return_value = chain
     chain.gte.return_value = chain
     chain.lte.return_value = chain
+    chain.filter.return_value = chain
     chain.order.return_value = chain
     chain.range.return_value = chain
     chain.ilike.return_value = chain
