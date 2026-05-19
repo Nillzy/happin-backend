@@ -165,3 +165,15 @@ The production server listens on `http://vm552.ipp-vps.net:8001`.
 If you make commits, they should always be in german.
 Never push to the main branch. If you start a new topic open a new one.
 
+## Event Soft-Delete
+
+Events können von Hosts soft-gelöscht werden.
+
+- **Endpoint**: `DELETE /api/v1/events/{event_id}` — nur Host, nur wenn `starts_at - now() >= 48h`, Response: 204
+- **Feld**: `event.deleted_at TIMESTAMPTZ NULL` — NULL = aktiv
+- **Service**: `event_service.delete_event()` — setzt `deleted_at`
+- **Sichtbarkeit**: Gelöschte Events für 48h für Host/Teilnehmer sichtbar (`is_deleted=true`), danach ausgeblendet
+- **API-Response**: `is_deleted: bool` und `deleted_at: datetime | None` in allen Event-Endpoints
+- **Tests**: `backend/tests/test_events_delete.py`
+- **Docs**: `backend/documentation/20-event-soft-delete.md`
+

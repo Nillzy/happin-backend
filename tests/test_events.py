@@ -67,35 +67,39 @@ def _mock_chain(mock_supabase, data):
     def select_side_effect(*args, **kwargs):
         select_result = MagicMock()
 
-        # Count query: .select("event_id", count="exact").eq().eq().gte().execute()
+        # Count query: .select("event_id", count="exact").eq().eq().gte().filter().execute()
         if kwargs.get("count") == "exact":
             count_response = MagicMock()
             count_response.count = len(data)
 
-            # Build chain: select -> eq -> eq -> gte -> execute
+            # Build chain: select -> eq -> eq -> gte -> filter -> execute
             eq1_mock = MagicMock()
             eq2_mock = MagicMock()
             gte_mock = MagicMock()
-            gte_mock.execute.return_value = count_response
+            filter_mock = MagicMock()
+            filter_mock.execute.return_value = count_response
+            gte_mock.filter.return_value = filter_mock
             eq2_mock.gte.return_value = gte_mock
             eq1_mock.eq.return_value = eq2_mock
             select_result.eq.return_value = eq1_mock
 
             return select_result
 
-        # Events query: .select(...).eq().eq().gte().order().range().execute()
+        # Events query: .select(...).eq().eq().gte().filter().order().range().execute()
         events_response = MagicMock()
         events_response.data = data
 
-        # Build chain: select -> eq -> eq -> gte -> order -> range -> execute
+        # Build chain: select -> eq -> eq -> gte -> filter -> order -> range -> execute
         eq1_mock = MagicMock()
         eq2_mock = MagicMock()
         gte_mock = MagicMock()
+        filter_mock = MagicMock()
         order_mock = MagicMock()
         range_mock = MagicMock()
         range_mock.execute.return_value = events_response
         order_mock.range.return_value = range_mock
-        gte_mock.order.return_value = order_mock
+        filter_mock.order.return_value = order_mock
+        gte_mock.filter.return_value = filter_mock
         eq2_mock.gte.return_value = gte_mock
         eq1_mock.eq.return_value = eq2_mock
         select_result.eq.return_value = eq1_mock

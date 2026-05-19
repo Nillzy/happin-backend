@@ -77,6 +77,8 @@ def _to_list_item(raw: dict) -> EventListItem:
         rsvp_declined=rsvp_declined,
         waitlist_count=waitlist_count,
         ticket_revenue_cents=revenue_cents,
+        is_deleted=raw.get("deleted_at") is not None,
+        deleted_at=raw.get("deleted_at"),
     )
 
 
@@ -198,6 +200,8 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         ],
         my_rsvp_status=raw.get("my_rsvp_status"),
         ticket=raw.get("my_tickets") or [],
+        is_deleted=raw.get("deleted_at") is not None,
+        deleted_at=raw.get("deleted_at"),
     )
 
 
@@ -442,6 +446,40 @@ async def delete_participants(
     )
 
     return RemoveParticipantsResponse(removed_count=removed_count)
+
+
+_DELETE_EVENT_ERRORS = {
+    "too_close_to_start": (400, "Event kann nicht gelöscht werden: Beginn ist weniger als 48h entfernt"),
+    "already_deleted": (400, "Event wurde bereits gelöscht"),
+    "event_not_found": (404, "Event nicht gefunden"),
+}
+
+
+@router.delete("/{event_id}", status_code=204)
+async def delete_event_endpoint(
+    event_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Soft-delete an event. Only the host can delete. Event must start in > 48h."""
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=credentials.credentials,
+    )
+    person_id = person["person_id"]
+
+    try:
+        event_service.delete_event(
+            event_id=event_id,
+            person_id=person_id,
+            token=credentials.credentials,
+        )
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Nur der Host kann dieses Event löschen")
+    except ValueError as e:
+        code, detail = _DELETE_EVENT_ERRORS.get(str(e), (400, str(e)))
+        raise HTTPException(status_code=code, detail=detail)
 
 
 @router.post("/{event_id}/tickets/scan", response_model=ScanTicketResponse)
