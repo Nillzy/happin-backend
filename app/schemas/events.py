@@ -15,6 +15,8 @@ class LocationCreate(BaseModel):
     country: str | None = None
     type: str | None = None
     description: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
     @field_validator("city")
     @classmethod
@@ -40,6 +42,7 @@ class EventCreate(BaseModel):
     status: str = "published"
     image_url: str | None = None
     gradient_id: int | None = None
+    location_is_private: bool = False
 
     @field_validator("title")
     @classmethod
@@ -79,6 +82,8 @@ class LocationUpdate(BaseModel):
     house_number: str | None = None
     postal_code: str | None = None
     country: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class EventUpdate(BaseModel):
@@ -96,6 +101,7 @@ class EventUpdate(BaseModel):
     image_url: str | None = None
     gradient_id: int | None = None
     media_urls: list[str] | None = None
+    location_is_private: bool | None = None
 
     @field_validator("title")
     @classmethod
@@ -162,6 +168,7 @@ class EventListItem(BaseModel):
     ticket_revenue_cents: int = 0
     is_deleted: bool = False
     deleted_at: datetime | None = None
+    location_is_private: bool = False
 
 
 class EventListResponse(BaseModel):

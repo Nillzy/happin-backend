@@ -12,6 +12,30 @@ def _isoformat(value) -> str:
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
 
 
+def _strip_location_for_privacy(event_data: dict, supabase_user_id: str | None) -> dict:
+    """Strip location to city/country only if location_is_private and user hasn't accepted RSVP."""
+    if not event_data.get("location_is_private"):
+        return event_data
+    if event_data.get("is_host"):
+        return event_data
+    participations = event_data.get("event_participation") or []
+    user_accepted = any(
+        p.get("status") == "Accepted"
+        and (p.get("person") or {}).get("supabase_user_id") == supabase_user_id
+        for p in participations
+    )
+    if user_accepted:
+        return event_data
+    loc = event_data.get("location")
+    if loc:
+        event_data["location"] = {
+            "location_id": loc.get("location_id"),
+            "city": loc.get("city"),
+            "country": loc.get("country"),
+        }
+    return event_data
+
+
 def get_public_events(
     limit: int = 50,
     offset: int = 0,
@@ -119,6 +143,8 @@ def get_public_events(
             event["is_host"] = False
         if event["event_id"] in paid_event_ids:
             event["is_free"] = False
+        # For list view, participation data is not fetched, so non-hosts never have accepted RSVP
+        _strip_location_for_privacy(event, None)
 
     return events, total_count
 
@@ -217,6 +243,8 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
     if any(float(t.get("price", 0)) > 0 for t in ticket_options):
         data["is_free"] = False
 
+    _strip_location_for_privacy(data, supabase_user_id)
+
     return data
 
 
@@ -232,13 +260,15 @@ def create_event(data: dict, person_id: str, token: str, supabase_user_id: str |
     )
     location_id = location_resp.data[0]["location_id"]
 
-    coords = geocode_address(
-        street=location_data.get("street"),
-        house_number=location_data.get("house_number"),
-        postal_code=location_data.get("postal_code"),
-        city=location_data.get("city"),
-        country=location_data.get("country"),
-    )
+    coords = None
+    if location_data.get("latitude") is None or location_data.get("longitude") is None:
+        coords = geocode_address(
+            street=location_data.get("street"),
+            house_number=location_data.get("house_number"),
+            postal_code=location_data.get("postal_code"),
+            city=location_data.get("city"),
+            country=location_data.get("country"),
+        )
     if coords:
         supabase.table("location").update({
             "latitude": coords[0],
@@ -258,6 +288,7 @@ def create_event(data: dict, person_id: str, token: str, supabase_user_id: str |
         "status": data.get("status", "published"),
         "location_id": location_id,
         "invitation_link": invitation_link,
+        "location_is_private": data.get("location_is_private", False),
     }
     if data.get("ends_at"):
         event_payload["ends_at"] = _isoformat(data["ends_at"])
@@ -311,7 +342,34 @@ def update_event(event_id: str, data: dict, person_id: str, token: str, supabase
             .execute()
         )
         location_id = event_row.data["location_id"]
-        loc_patch = {k: v for k, v in location_data.items() if v is not None}
+        has_coords = location_data.get("latitude") is not None and location_data.get("longitude") is not None
+        # city allein gilt nicht als vollständige Adresse — nur Straße/PLZ/Land zählen
+        has_address = any(location_data.get(f) for f in ("street", "house_number", "postal_code", "country"))
+        if has_coords and not has_address:
+            # Koordinaten-Ort (ggf. mit Stadt): alte Adressfelder löschen
+            loc_patch = {
+                "latitude": location_data["latitude"],
+                "longitude": location_data["longitude"],
+                "city": location_data.get("city"),
+                "street": None,
+                "house_number": None,
+                "postal_code": None,
+                "country": None,
+            }
+        else:
+            loc_patch = {k: v for k, v in location_data.items() if v is not None}
+            # Koordinaten aus Adresse ermitteln, falls nicht mitgeschickt
+            if not has_coords:
+                coords = geocode_address(
+                    street=location_data.get("street"),
+                    house_number=location_data.get("house_number"),
+                    postal_code=location_data.get("postal_code"),
+                    city=location_data.get("city"),
+                    country=location_data.get("country"),
+                )
+                if coords:
+                    loc_patch["latitude"] = coords[0]
+                    loc_patch["longitude"] = coords[1]
         if loc_patch:
             supabase.table("location").update(loc_patch).eq("location_id", location_id).execute()
 
