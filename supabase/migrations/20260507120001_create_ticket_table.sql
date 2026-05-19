@@ -5,7 +5,7 @@ DROP INDEX IF EXISTS idx_ticket_participation;
 DROP POLICY IF EXISTS "Users can read own tickets" ON ticket;
 DROP POLICY IF EXISTS "Hosts can read event tickets" ON ticket;
 DROP POLICY IF EXISTS "Service role full access" ON ticket;
-DROP TABLE IF EXISTS public.ticket;
+DROP TABLE IF EXISTS public.ticket CASCADE;
 
 CREATE TABLE public.ticket (
     ticket_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
