@@ -79,6 +79,7 @@ def _to_list_item(raw: dict) -> EventListItem:
         ticket_revenue_cents=revenue_cents,
         is_deleted=raw.get("deleted_at") is not None,
         deleted_at=raw.get("deleted_at"),
+        location_is_private=raw.get("location_is_private", False),
     )
 
 
@@ -202,6 +203,7 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         ticket=raw.get("my_tickets") or [],
         is_deleted=raw.get("deleted_at") is not None,
         deleted_at=raw.get("deleted_at"),
+        location_is_private=raw.get("location_is_private", False),
     )
 
 
