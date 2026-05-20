@@ -220,9 +220,7 @@ def fulfill_ticket_order(order_id: str, payment_intent_id: str | None = None) ->
     p = person.data
     guest_name = " ".join(x for x in [p.get("first_name", ""), p.get("last_name", "")] if x).strip() or "Gast"
 
-    # We need a user token for supabase operations — use service role for fulfillment
-    from app.core.supabase import get_supabase as get_service_supabase
-    svc = get_service_supabase()
+    svc = get_supabase()
 
     # Create tickets using service supabase (bypasses RLS)
     from app.core.ticket_token import generate_ticket_token
