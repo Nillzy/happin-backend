@@ -28,3 +28,24 @@ def mock_supabase():
     """Reset and return the shared mock Supabase client."""
     _mock_supabase.reset_mock(side_effect=True, return_value=True)
     return _mock_supabase
+
+
+@pytest.fixture
+def auth_headers(mock_supabase):
+    """Authenticated request headers + mocked auth.get_user and person lookup.
+
+    Use in tests that hit endpoints requiring `get_current_user`.
+    """
+    mock_supabase.auth.get_user.return_value = MagicMock(
+        user=MagicMock(id="uid-test", email="test@example.com")
+    )
+    with patch(
+        "app.api.v1.events.person_service.get_or_create_person",
+        return_value={
+            "person_id": "p-test",
+            "supabase_user_id": "uid-test",
+            "email_address": "test@example.com",
+            "first_name": "Test",
+        },
+    ):
+        yield {"Authorization": "Bearer fake-token"}

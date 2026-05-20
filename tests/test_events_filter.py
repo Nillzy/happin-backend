@@ -67,62 +67,62 @@ def _setup_flexible_chain(mock_supabase, data):
     mock_supabase.table.return_value.select.return_value = chain
 
 
-def test_filter_by_city(client, mock_supabase):
+def test_filter_by_city(client, mock_supabase, auth_headers):
     _setup_flexible_chain(mock_supabase, [MOCK_BERLIN, MOCK_MUNICH])
-    response = client.get("/api/v1/events/?city=Berlin")
+    response = client.get("/api/v1/events/?city=Berlin", headers=auth_headers)
     assert response.status_code == 200
     events = response.json()["events"]
     assert len(events) == 1
     assert events[0]["event_id"] == MOCK_BERLIN["event_id"]
 
 
-def test_filter_by_city_case_insensitive(client, mock_supabase):
+def test_filter_by_city_case_insensitive(client, mock_supabase, auth_headers):
     _setup_flexible_chain(mock_supabase, [MOCK_BERLIN, MOCK_MUNICH])
-    response = client.get("/api/v1/events/?city=berlin")
+    response = client.get("/api/v1/events/?city=berlin", headers=auth_headers)
     assert response.status_code == 200
     events = response.json()["events"]
     assert len(events) == 1
     assert events[0]["location"]["city"] == "Berlin"
 
 
-def test_filter_by_category(client, mock_supabase):
+def test_filter_by_category(client, mock_supabase, auth_headers):
     _setup_flexible_chain(mock_supabase, [MOCK_BERLIN, MOCK_MUNICH])
-    response = client.get("/api/v1/events/?categories=Musik")
+    response = client.get("/api/v1/events/?categories=Musik", headers=auth_headers)
     assert response.status_code == 200
     events = response.json()["events"]
     assert len(events) == 1
     assert events[0]["event_id"] == MOCK_BERLIN["event_id"]
 
 
-def test_filter_by_multiple_categories(client, mock_supabase):
+def test_filter_by_multiple_categories(client, mock_supabase, auth_headers):
     _setup_flexible_chain(mock_supabase, [MOCK_BERLIN, MOCK_MUNICH])
-    response = client.get("/api/v1/events/?categories=Musik,Sport")
+    response = client.get("/api/v1/events/?categories=Musik,Sport", headers=auth_headers)
     assert response.status_code == 200
     events = response.json()["events"]
     assert len(events) == 2
 
 
-def test_filter_by_is_free(client, mock_supabase):
+def test_filter_by_is_free(client, mock_supabase, auth_headers):
     # Supabase mock returns only the free event (is_free filter applied at DB level)
     _setup_flexible_chain(mock_supabase, [MOCK_BERLIN])
-    response = client.get("/api/v1/events/?is_free=true")
+    response = client.get("/api/v1/events/?is_free=true", headers=auth_headers)
     assert response.status_code == 200
     events = response.json()["events"]
     assert len(events) == 1
     assert events[0]["is_free"] is True
 
 
-def test_no_filter_returns_all(client, mock_supabase):
+def test_no_filter_returns_all(client, mock_supabase, auth_headers):
     _setup_flexible_chain(mock_supabase, [MOCK_BERLIN, MOCK_MUNICH])
-    response = client.get("/api/v1/events/")
+    response = client.get("/api/v1/events/", headers=auth_headers)
     assert response.status_code == 200
     events = response.json()["events"]
     assert len(events) == 2
 
 
-def test_filter_city_no_match(client, mock_supabase):
+def test_filter_city_no_match(client, mock_supabase, auth_headers):
     _setup_flexible_chain(mock_supabase, [MOCK_BERLIN, MOCK_MUNICH])
-    response = client.get("/api/v1/events/?city=Hamburg")
+    response = client.get("/api/v1/events/?city=Hamburg", headers=auth_headers)
     assert response.status_code == 200
     events = response.json()["events"]
     assert len(events) == 0

@@ -36,6 +36,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 optional_bearer = HTTPBearer(auto_error=False)
+_bearer = HTTPBearer()
+
+
+def _me_token(credentials=Depends(_bearer)) -> str:
+    return credentials.credentials
 
 
 def _to_list_item(raw: dict) -> EventListItem:
@@ -93,23 +98,22 @@ async def list_public_events(
     city: Optional[str] = Query(default=None),
     is_free: Optional[bool] = Query(default=None),
     search: Optional[str] = Query(default=None),
-    user=Depends(get_current_user_optional),
-    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
+    user=Depends(get_current_user),
+    token: str = Depends(_me_token),
 ):
     """List public events with optional filtering and pagination."""
-    person_id = None
-    if user and credentials:
-        person = person_service.get_or_create_person(
-            supabase_user_id=user.user.id,
-            email=user.user.email,
-            token=credentials.credentials,
-        )
-        person_id = person["person_id"]
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=token,
+    )
+    person_id = person["person_id"]
 
     raw_events, total_count = event_service.get_public_events(
         limit=limit,
         offset=offset,
         person_id=person_id,
+        token=token,
         date_from=date_from,
         date_to=date_to,
         categories=categories,
@@ -119,13 +123,6 @@ async def list_public_events(
     )
     events = [_to_list_item(e) for e in raw_events]
     return EventListResponse(events=events, count=total_count)
-
-
-_bearer = HTTPBearer()
-
-
-def _me_token(credentials=Depends(_bearer)) -> str:
-    return credentials.credentials
 
 
 @router.get("/me", response_model=EventListResponse)
