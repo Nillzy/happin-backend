@@ -146,6 +146,9 @@ def create_checkout_session(
     if "{CHECKOUT_SESSION_ID}" not in success_url:
         separator = "&" if "?" in success_url else "?"
         success_url += f"{separator}session_id={{CHECKOUT_SESSION_ID}}"
+    # Append event_id so the frontend can navigate to the correct ticket
+    separator = "&" if "?" in success_url else "?"
+    success_url += f"{separator}event_id={event_id}"
 
     cancel_url = settings.STRIPE_CHECKOUT_CANCEL_URL or success_url
 
