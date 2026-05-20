@@ -287,6 +287,11 @@ _RSVP_STATUS_ERRORS = {
     "event_in_past":   (400, "RSVP not possible after event has started"),
     "public_event_accepted_only": (400, "Public events only allow status 'Accepted'"),
     "event_full": (409, "Event is fully booked"),
+    "max_tickets_exceeded": (409, "Maximum tickets per person exceeded"),
+    "paid_tickets_use_cancel": (
+        400,
+        "Paid tickets cannot be cancelled via RSVP — use ticket cancellation for a refund",
+    ),
 }
 
 
@@ -316,23 +321,31 @@ async def rsvp_to_event(
             p for p in [person.get("first_name", ""), person.get("last_name", "")] if p
         ).strip() or None
 
-        if body.status == "Accepted":
-            from app.core.supabase import get_supabase_for_user
-            supabase = get_supabase_for_user(credentials.credentials)
-            max_per_person = 1
-            try:
-                event_row = (
-                    supabase.table("event")
-                    .select("max_tickets_per_person")
-                    .eq("event_id", event_id)
-                    .single()
-                    .execute()
-                )
-                max_per_person = (event_row.data or {}).get("max_tickets_per_person") or 1
-            except Exception:
-                pass
+        from app.core.supabase import get_supabase_for_user
+        from app.services import booking_service
+
+        supabase = get_supabase_for_user(credentials.credentials)
+
+        if body.status == "Declined":
+            if booking_service.user_has_paid_purchase(supabase, event_id, person_id):
+                raise ValueError("paid_tickets_use_cancel")
+            ticket_service.delete_tickets_for_event(
+                event_id=event_id,
+                person_id=person_id,
+                token=credentials.credentials,
+            )
+        elif body.status == "Accepted":
+            max_per_person = booking_service.get_max_tickets_per_person(supabase, event_id)
             ticket_count = min(body.ticket_count, max_per_person)
-            print(f"[RSVP] guest_names from request: {body.guest_names}")
+
+            booking_service.validate_booking(
+                supabase,
+                event_id=event_id,
+                person_id=person_id,
+                quantity=ticket_count,
+                ticket_option_id=None,
+                allow_free_only=True,
+            )
 
             ticket_service.create_tickets(
                 event_id=event_id,
@@ -342,8 +355,6 @@ async def rsvp_to_event(
                 guest_names=body.guest_names,
                 quantity=ticket_count,
             )
-        elif body.status == "Declined":
-            ticket_service.delete_tickets_for_event(event_id=event_id, person_id=person_id, token=credentials.credentials)
 
         return RsvpResponse(**raw)
     except ValueError as e:

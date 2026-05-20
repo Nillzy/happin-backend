@@ -8,11 +8,21 @@ from fastapi.security import HTTPBearer
 from app.core.auth import get_current_user
 from app.core.supabase import get_supabase_for_user
 from app.schemas.tickets import CreateTicketsRequest, CreateTicketsResponse
-from app.services import event_service, person_service, ticket_service
+from app.services import booking_service, event_service, person_service, ticket_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_BOOKING_ERRORS = {
+    "event_not_found": (404, "Event not found"),
+    "event_full": (409, "Event is fully booked"),
+    "ticket_option_wrong_event": (400, "Ticket option does not belong to this event"),
+    "ticket_option_sold_out": (409, "Ticket option sold out"),
+    "payment_required": (400, "Paid tickets require checkout — use /checkout-session"),
+    "max_tickets_exceeded": (409, "Maximum tickets per person exceeded"),
+    "checkout_pending": (409, "You already have a pending checkout for this event"),
+}
 
 
 @router.post("/{event_id}/tickets", response_model=CreateTicketsResponse)
@@ -35,40 +45,16 @@ async def create_tickets(
             p for p in [person.get("first_name", ""), person.get("last_name", "")] if p
         ).strip() or None
 
-        # Capacity check: current tickets + requested quantity must fit
         supabase = get_supabase_for_user(token)
-        event_row = (
-            supabase.table("event")
-            .select("max_capacity")
-            .eq("event_id", event_id)
-            .maybe_single()
-            .execute()
+
+        booking_service.validate_booking(
+            supabase,
+            event_id=event_id,
+            person_id=person_id,
+            quantity=body.quantity,
+            ticket_option_id=body.ticket_option_id,
+            allow_free_only=True,
         )
-        if not event_row.data:
-            raise ValueError("event_not_found")
-
-        # Guard: paid ticket options must go through checkout
-        if body.ticket_option_id:
-            opt_row = (
-                supabase.table("ticket_option")
-                .select("price")
-                .eq("ticket_option_id", body.ticket_option_id)
-                .maybe_single()
-                .execute()
-            )
-            if opt_row.data and float(opt_row.data.get("price", 0)) > 0:
-                raise ValueError("payment_required")
-
-        max_cap = event_row.data.get("max_capacity")
-        if max_cap is not None:
-            current_count = (
-                supabase.table("ticket")
-                .select("ticket_id", count="exact")
-                .eq("event_id", event_id)
-                .execute()
-            ).count or 0
-            if current_count + body.quantity > int(max_cap):
-                raise ValueError("event_full")
 
         event_service.rsvp_event(
             event_id=event_id,
@@ -89,13 +75,7 @@ async def create_tickets(
 
         return CreateTicketsResponse(tickets=tickets)
     except ValueError as e:
-        error_map = {
-            "event_not_found": (404, "Event not found"),
-            "event_in_past": (400, "Event has already started"),
-            "event_full": (409, "Event is fully booked"),
-            "payment_required": (400, "Paid tickets require checkout — use /checkout-session"),
-        }
-        code, detail = error_map.get(str(e), (400, str(e)))
+        code, detail = _BOOKING_ERRORS.get(str(e), (400, str(e)))
         raise HTTPException(status_code=code, detail=detail)
     except HTTPException:
         raise

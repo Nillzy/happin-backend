@@ -98,6 +98,7 @@ def create_checkout_session(
         "payment_intent_data": {
             "application_fee_amount": application_fee_amount,
             "transfer_data": {"destination": destination_account_id},
+            "metadata": metadata,
         },
         "success_url": success_url,
         "cancel_url": cancel_url,
@@ -129,13 +130,25 @@ def retrieve_balance(account_id: str) -> Any:
     return client.v1.balance.retrieve(options={"stripe_account": account_id})
 
 
-def create_refund(payment_intent_id: str, amount: int | None = None) -> Any:
-    """Create a refund for a payment intent (full or partial)."""
+def create_refund(
+    payment_intent_id: str,
+    amount: int | None = None,
+    *,
+    idempotency_key: str | None = None,
+) -> Any:
+    """Refund a destination charge; reverse transfer and application fee to host."""
     client = get_stripe_client()
-    params: dict[str, Any] = {"payment_intent": payment_intent_id}
+    params: dict[str, Any] = {
+        "payment_intent": payment_intent_id,
+        "reverse_transfer": True,
+        "refund_application_fee": True,
+    }
     if amount is not None:
         params["amount"] = amount
-    return client.v1.refunds.create(params=params)
+    options: dict[str, Any] = {}
+    if idempotency_key:
+        options["idempotency_key"] = idempotency_key
+    return client.v1.refunds.create(params=params, options=options or None)
 
 
 def create_payout(account_id: str, amount: int, currency: str = "eur") -> Any:

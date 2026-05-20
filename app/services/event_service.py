@@ -225,8 +225,16 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
         )
 
         my_person_id = None
-        if my_participation:
-            my_person_id = my_participation.get("person", {}).get("person_id")
+        person_row = (
+            supabase.table("person")
+            .select("person_id")
+            .eq("supabase_user_id", supabase_user_id)
+            .maybe_single()
+            .execute()
+        )
+        person_data = getattr(person_row, "data", None) if person_row else None
+        if person_data:
+            my_person_id = person_data["person_id"]
         all_tickets = data.get("ticket") or []
         data["my_tickets"] = [
             {"ticket_id": t["ticket_id"], "guest_name": t.get("guest_name")}
