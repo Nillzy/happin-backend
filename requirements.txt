@@ -14,8 +14,8 @@ google-auth==2.29.0
 PyJWT==2.10.1
 cryptography>=42.0.0
 
-# External APIs (optional - install as needed)
-# stripe==7.0.0
+# External APIs
+stripe>=11.0.0
 # twilio==8.10.0
 # requests==2.31.0
 

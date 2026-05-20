@@ -295,6 +295,8 @@ def create_event(data: dict, person_id: str, token: str, supabase_user_id: str |
     if data.get("gradient_id") is not None:
         event_payload["gradient_id"] = data["gradient_id"]
 
+    event_payload["payout_person_id"] = person_id
+
     event_resp = (
         supabase.table("event")
         .insert(event_payload)
