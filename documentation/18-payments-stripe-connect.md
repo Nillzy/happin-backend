@@ -72,6 +72,8 @@ Gast → Frontend → Backend → Stripe Checkout Session (gehostet)
 | GET | `/api/v1/connect/status` | Host | Onboarding-Status |
 | POST | `/api/v1/connect/dashboard-link` | Host | Login Link für Express Dashboard |
 | POST | `/api/v1/events/{id}/checkout-session` | Gast | Checkout Session erstellen |
+| GET | `/api/v1/checkout/orders/status?session_id=` | Gast | Fulfillment-Status nach Checkout |
+| POST | `/api/v1/events/{id}/tickets/cancel` | Gast | Stornierung + Refund |
 | POST | `/api/v1/webhooks/stripe` | Stripe Sig | Webhook-Handler |
 | GET | `/api/v1/events/{id}/payments/summary` | Host | Umsatz-Übersicht |
 | POST | `/api/v1/events/{id}/payout` | Host | Auszahlung anfordern |
@@ -84,13 +86,30 @@ Gast → Frontend → Backend → Stripe Checkout Session (gehostet)
 4. Frontend öffnet `checkout_url` (Stripe-gehostete Zahlungsseite)
 5. Nach Zahlung: Stripe sendet `checkout.session.completed` Webhook
 6. Backend prüft `payment_status == 'paid'`, erstellt Tickets + RSVP
-7. Gast wird zu Success-Route redirected, sieht Ticket
+7. Gast wird zu Success-Route redirected (`session_id` + `event_id` in URL)
+8. Frontend pollt `GET /checkout/orders/status?session_id=…` bis `fulfilled=true`
+9. Weiterleitung zu `/ticket/{event_id}` (QR)
 
 ### Sicherheit
 
 - `POST /events/{id}/tickets` lehnt `ticket_option.price > 0` ab (HTTP 400)
+- Checkout prüft, dass `ticket_option.event_id` zum Event passt
 - Webhook-Signatur wird mit `STRIPE_WEBHOOK_SECRET` verifiziert
-- Idempotenz: doppelte Webhook-Events → `order.status == paid` → No-Op
+- Idempotenz: doppelte Webhook-Events → Order bereits `paid` mit Tickets → No-Op
+- Fulfillment: Tickets werden **vor** Status `paid` angelegt (kein „paid ohne Ticket“)
+- Metadata auf Checkout Session **und** PaymentIntent (`ticket_order_id`, `event_id`, `person_id`)
+
+### Stornierung
+
+- `POST /events/{id}/tickets/cancel`: Stripe Refund mit `reverse_transfer` + `refund_application_fee` (Destination Charges)
+- Erst nach erfolgreichem Refund (`succeeded`/`pending`): DB `refunded`, Tickets löschen, RSVP `Declined`
+- Idempotent: bereits `refunded` → 200 ohne erneuten Refund
+- RSVP `Declined` löscht **nur kostenlose** Tickets (`ticket_order_id IS NULL`); bezahlte Tickets erfordern den Cancel-Endpoint
+
+### Gemeinsame Buchungslogik (`booking_service`)
+
+- Kapazität, `max_tickets_per_person`, Ticketoption-Zugehörigkeit und `quantity_limit` gelten einheitlich für RSVP, `POST /tickets` und Checkout
+- Bezahlte Tickets werden zentral über `ticket_service.create_tickets_for_order` erstellt (gleiche QR-Logik wie Gratis-Tickets)
 
 ## Gebührenmodell
 

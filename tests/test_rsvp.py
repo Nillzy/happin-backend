@@ -183,16 +183,18 @@ class TestRsvpEndpoint:
             with patch("app.services.event_service.rsvp_event", return_value=PARTICIPATION_DATA):
                 with patch("app.api.v1.events.person_service.get_or_create_person", return_value={"person_id": "pid-1", "first_name": "Test", "last_name": "User"}):
                     with patch("app.api.v1.events.ticket_service.create_tickets"):
-                        mock_sb = MagicMock()
-                        mock_sb.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value.data = {"max_tickets_per_person": 1}
-                        with patch("app.core.supabase.get_supabase_for_user", return_value=mock_sb):
-                            response = self._make_request()
+                        with patch("app.services.booking_service.get_max_tickets_per_person", return_value=1):
+                            with patch("app.services.booking_service.validate_booking"):
+                                with patch("app.services.booking_service.user_has_paid_purchase", return_value=False):
+                                    mock_sb = MagicMock()
+                                    with patch("app.core.supabase.get_supabase_for_user", return_value=mock_sb):
+                                        response = self._make_request()
 
-                            assert response.status_code == 200
-                            data = response.json()
-                            assert data["status"] == "Accepted"
-                            assert data["event_id"] == EVENT_ID
-                            assert data["event_participation_id"] == PARTICIPATION_ID
+                                        assert response.status_code == 200
+                                        data = response.json()
+                                        assert data["status"] == "Accepted"
+                                        assert data["event_id"] == EVENT_ID
+                                        assert data["event_participation_id"] == PARTICIPATION_ID
 
     def test_returns_403_without_token(self):
         response = self._make_request(token=None)

@@ -1,7 +1,140 @@
 """Ticket business logic — generation, deletion, and retrieval."""
 
+from __future__ import annotations
+
 from app.core.supabase import get_supabase_for_user
 from app.core.ticket_token import generate_ticket_token, verify_ticket_token
+
+
+def _resolve_guest_name(supabase, person_id: str, guest_name: str | None) -> str:
+    if guest_name:
+        return guest_name
+    person = (
+        supabase.table("person")
+        .select("first_name, last_name")
+        .eq("person_id", person_id)
+        .single()
+        .execute()
+    )
+    p = person.data or {}
+    parts = [p.get("first_name", ""), p.get("last_name", "")]
+    return " ".join(x for x in parts if x).strip() or "Gast"
+
+
+def _resolve_option_name(supabase, ticket_option_id: str | None, ticket_option_name: str | None) -> str | None:
+    if not ticket_option_id or ticket_option_name:
+        return ticket_option_name
+    opt = (
+        supabase.table("ticket_option")
+        .select("name")
+        .eq("ticket_option_id", ticket_option_id)
+        .single()
+        .execute()
+    )
+    return (opt.data or {}).get("name")
+
+
+def _decrement_option_limit(supabase, ticket_option_id: str, amount: int) -> None:
+    if amount <= 0 or not ticket_option_id:
+        return
+    opt_row = (
+        supabase.table("ticket_option")
+        .select("quantity_limit")
+        .eq("ticket_option_id", ticket_option_id)
+        .single()
+        .execute()
+    )
+    current_limit = (opt_row.data or {}).get("quantity_limit")
+    if current_limit is not None:
+        supabase.table("ticket_option").update({
+            "quantity_limit": max(0, current_limit - amount),
+        }).eq("ticket_option_id", ticket_option_id).execute()
+
+
+def ensure_participation_accepted(supabase, event_id: str, person_id: str) -> None:
+    """Set RSVP to Accepted (insert or update)."""
+    existing = (
+        supabase.table("event_participation")
+        .select("event_participation_id")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .maybe_single()
+        .execute()
+    )
+    ep_data = getattr(existing, "data", None) if existing else None
+    if ep_data:
+        supabase.table("event_participation").update({"status": "Accepted"}).eq(
+            "event_participation_id", ep_data["event_participation_id"]
+        ).execute()
+    else:
+        supabase.table("event_participation").insert({
+            "event_id": event_id,
+            "person_id": person_id,
+            "status": "Accepted",
+        }).execute()
+
+
+def create_tickets_for_order(
+    supabase,
+    *,
+    ticket_order_id: str,
+    event_id: str,
+    person_id: str,
+    ticket_option_id: str | None,
+    quantity: int,
+    guest_name: str | None = None,
+    guest_names: list[str] | None = None,
+) -> list[dict]:
+    """Create tickets for a paid order (admin client). Idempotent per order_id."""
+    existing = (
+        supabase.table("ticket")
+        .select("ticket_id")
+        .eq("ticket_order_id", ticket_order_id)
+        .execute()
+    )
+    if existing.data:
+        return existing.data
+
+    guest_name = _resolve_guest_name(supabase, person_id, guest_name)
+    ticket_option_name = _resolve_option_name(supabase, ticket_option_id, None)
+
+    existing_resp = (
+        supabase.table("ticket")
+        .select("ticket_id", count="exact")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .execute()
+    )
+    existing_count = existing_resp.count or 0
+
+    if not guest_names and quantity > 1:
+        base = guest_name.rstrip()
+        guest_names = [f"{base} {i + 1}" for i in range(quantity)]
+
+    payloads = []
+    for i in range(quantity):
+        ticket_nr = existing_count + i + 1
+        name = (
+            guest_names[i].strip()
+            if guest_names and i < len(guest_names)
+            else guest_name
+        ) or "Gast"
+        qr_token = generate_ticket_token(event_id, name, ticket_nr, ticket_option_name)
+        payload: dict = {
+            "event_id": event_id,
+            "person_id": person_id,
+            "qr_token": qr_token,
+            "guest_name": name,
+            "ticket_order_id": ticket_order_id,
+        }
+        if ticket_option_id:
+            payload["ticket_option_id"] = ticket_option_id
+        payloads.append(payload)
+
+    result = supabase.table("ticket").insert(payloads).execute()
+    _decrement_option_limit(supabase, ticket_option_id, len(payloads))
+    ensure_participation_accepted(supabase, event_id, person_id)
+    return result.data or []
 
 
 def create_tickets(
@@ -14,18 +147,10 @@ def create_tickets(
     guest_names: list[str] | None = None,
     ticket_option_name: str | None = None,
 ) -> list[dict]:
-    """Create one or more tickets with HMAC-signed qr_tokens."""
+    """Create one or more free/RSVP tickets with HMAC-signed qr_tokens (user RLS)."""
     supabase = get_supabase_for_user(token)
-
-    if not guest_name:
-        person = supabase.table("person").select("first_name, last_name").eq("person_id", person_id).single().execute()
-        p = person.data or {}
-        parts = [p.get("first_name", ""), p.get("last_name", "")]
-        guest_name = " ".join(x for x in parts if x).strip() or "Gast"
-
-    if ticket_option_id and not ticket_option_name:
-        opt = supabase.table("ticket_option").select("name").eq("ticket_option_id", ticket_option_id).single().execute()
-        ticket_option_name = (opt.data or {}).get("name")
+    guest_name = _resolve_guest_name(supabase, person_id, guest_name)
+    ticket_option_name = _resolve_option_name(supabase, ticket_option_id, ticket_option_name)
 
     existing_resp = (
         supabase.table("ticket")
@@ -36,14 +161,17 @@ def create_tickets(
         .execute()
     )
     existing_count = existing_resp.count or 0
+    existing_rows = existing_resp.data or []
 
-    # When names are provided, patch existing tickets so a re-RSVP updates names too.
     if guest_names and existing_count > 0:
-        existing_ids = [r["ticket_id"] for r in (existing_resp.data or [])]
-        for i, tid in enumerate(existing_ids):
+        for i, row in enumerate(existing_rows):
+            tid = row["ticket_id"]
             name = (guest_names[i].strip() if i < len(guest_names) else None) or guest_name or "Gast"
             qr_token = generate_ticket_token(event_id, name, i + 1, ticket_option_name)
-            supabase.table("ticket").update({"guest_name": name, "qr_token": qr_token}).eq("ticket_id", tid).execute()
+            supabase.table("ticket").update({
+                "guest_name": name,
+                "qr_token": qr_token,
+            }).eq("ticket_id", tid).execute()
 
     if existing_count >= quantity:
         return []
@@ -52,7 +180,11 @@ def create_tickets(
     for i in range(quantity - existing_count):
         ticket_nr = existing_count + i + 1
         name_idx = existing_count + i
-        name = (guest_names[name_idx] if guest_names and name_idx < len(guest_names) else guest_name) or "Gast"
+        name = (
+            guest_names[name_idx]
+            if guest_names and name_idx < len(guest_names)
+            else guest_name
+        ) or "Gast"
         qr_token = generate_ticket_token(event_id, name, ticket_nr, ticket_option_name)
         payload: dict = {
             "event_id": event_id,
@@ -64,21 +196,20 @@ def create_tickets(
             payload["ticket_option_id"] = ticket_option_id
         payloads.append(payload)
 
+    if not payloads:
+        return []
+
     result = supabase.table("ticket").insert(payloads).execute()
-
-    if ticket_option_id:
-        opt_row = supabase.table("ticket_option").select("quantity_limit").eq("ticket_option_id", ticket_option_id).single().execute()
-        current_limit = (opt_row.data or {}).get("quantity_limit")
-        if current_limit is not None:
-            supabase.table("ticket_option").update({"quantity_limit": max(0, current_limit - quantity)}).eq("ticket_option_id", ticket_option_id).execute()
-
-    return result.data
+    _decrement_option_limit(supabase, ticket_option_id, len(payloads))
+    return result.data or []
 
 
 def delete_tickets_for_event(event_id: str, person_id: str, token: str) -> None:
-    """Delete ALL tickets for a person at a given event (used on RSVP decline)."""
+    """Delete free RSVP tickets only (not paid / order-linked tickets)."""
     supabase = get_supabase_for_user(token)
-    supabase.table("ticket").delete().eq("event_id", event_id).eq("person_id", person_id).execute()
+    supabase.table("ticket").delete().eq("event_id", event_id).eq(
+        "person_id", person_id
+    ).is_("ticket_order_id", "null").execute()
 
 
 def delete_ticket_by_id(ticket_id: str, token: str) -> None:

@@ -13,6 +13,13 @@ class CreateCheckoutSessionResponse(BaseModel):
     ticket_order_id: str
 
 
+class CheckoutOrderStatusResponse(BaseModel):
+    order_status: str
+    fulfilled: bool
+    event_id: str
+    ticket_order_id: str
+
+
 class ConnectOnboardingResponse(BaseModel):
     url: str
     account_id: str

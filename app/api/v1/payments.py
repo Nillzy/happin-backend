@@ -14,6 +14,7 @@ from app.adapters import stripe_payment
 from app.schemas.payments import (
     CreateCheckoutSessionRequest,
     CreateCheckoutSessionResponse,
+    CheckoutOrderStatusResponse,
     ConnectOnboardingResponse,
     ConnectStatusResponse,
     DashboardLinkResponse,
@@ -179,13 +180,45 @@ async def create_checkout_session(
     except ValueError as e:
         error_map = {
             "ticket_option_free": (400, "This ticket option is free — use direct booking"),
+            "ticket_option_wrong_event": (400, "Ticket option does not belong to this event"),
+            "ticket_option_required": (400, "A ticket option is required for checkout"),
             "event_full": (409, "Event is fully booked"),
+            "event_not_found": (404, "Event not found"),
             "ticket_option_sold_out": (409, "Ticket option sold out"),
+            "max_tickets_exceeded": (409, "Maximum tickets per person exceeded"),
+            "checkout_pending": (409, "You already have a pending checkout for this event"),
             "host_not_onboarded": (402, "Host has not completed payment setup"),
             "host_charges_not_enabled": (402, "Host payment account is not yet active"),
         }
         code, detail = error_map.get(str(e), (400, str(e)))
         raise HTTPException(status_code=code, detail=detail)
+
+
+@router.get(
+    "/checkout/orders/status",
+    response_model=CheckoutOrderStatusResponse,
+)
+async def get_checkout_order_status(
+    session_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Poll checkout fulfillment by Stripe session ID (success page)."""
+    token = credentials.credentials
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=token,
+    )
+    try:
+        return payment_service.get_checkout_order_status(
+            session_id=session_id,
+            person_id=person["person_id"],
+        )
+    except ValueError as e:
+        if str(e) == "order_not_found":
+            raise HTTPException(status_code=404, detail="Order not found for this session")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ── Cancel / Refund ───────────────────────────────────────────────────────────
@@ -213,6 +246,7 @@ async def cancel_tickets(
     except ValueError as e:
         error_map = {
             "no_paid_order": (404, "No active paid ticket order found for this event"),
+            "refund_failed": (502, "Refund could not be processed. Please try again later."),
         }
         code, detail = error_map.get(str(e), (400, str(e)))
         raise HTTPException(status_code=code, detail=detail)
