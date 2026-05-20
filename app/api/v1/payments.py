@@ -205,23 +205,28 @@ async def stripe_webhook(request: Request):
 
     event_type = event.type
     data = event.data.object
+    logger.info("Webhook received: %s", event_type)
 
-    if event_type == "checkout.session.completed":
-        _handle_checkout_completed(data)
-    elif event_type == "checkout.session.async_payment_succeeded":
-        _handle_async_payment_succeeded(data)
-    elif event_type == "checkout.session.async_payment_failed":
-        _handle_async_payment_failed(data)
-    elif event_type == "checkout.session.expired":
-        _handle_checkout_expired(data)
-    elif event_type == "payment_intent.succeeded":
-        _handle_payment_intent_succeeded(data)
-    elif event_type == "account.updated":
-        _handle_account_updated(data)
-    elif event_type in ("payout.paid", "payout.failed"):
-        logger.info("Payout event: %s", event_type)
-    else:
-        logger.debug("Unhandled event type: %s", event_type)
+    try:
+        if event_type == "checkout.session.completed":
+            _handle_checkout_completed(data)
+        elif event_type == "checkout.session.async_payment_succeeded":
+            _handle_async_payment_succeeded(data)
+        elif event_type == "checkout.session.async_payment_failed":
+            _handle_async_payment_failed(data)
+        elif event_type == "checkout.session.expired":
+            _handle_checkout_expired(data)
+        elif event_type == "payment_intent.succeeded":
+            _handle_payment_intent_succeeded(data)
+        elif event_type == "account.updated":
+            _handle_account_updated(data)
+        elif event_type in ("payout.paid", "payout.failed"):
+            logger.info("Payout event: %s", event_type)
+        else:
+            logger.debug("Unhandled event type: %s", event_type)
+    except Exception:
+        logger.exception("Webhook handler failed for event: %s", event_type)
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
 
     return {"received": True}
 

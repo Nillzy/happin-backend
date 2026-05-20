@@ -282,9 +282,10 @@ def fulfill_ticket_order(order_id: str, payment_intent_id: str | None = None) ->
         .maybe_single()
         .execute()
     )
-    if existing_participation.data:
+    ep_data = getattr(existing_participation, "data", None) if existing_participation else None
+    if ep_data:
         svc.table("event_participation").update({"status": "Accepted"}).eq(
-            "event_participation_id", existing_participation.data["event_participation_id"]
+            "event_participation_id", ep_data["event_participation_id"]
         ).execute()
     else:
         svc.table("event_participation").insert({
