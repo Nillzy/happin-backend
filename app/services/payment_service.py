@@ -314,6 +314,79 @@ def fail_ticket_order(order_id: str) -> None:
     ).eq("status", "pending").execute()
 
 
+def cancel_ticket_order(event_id: str, person_id: str) -> dict:
+    """Cancel a paid ticket order: refund via Stripe, delete tickets, update RSVP."""
+    supabase = get_supabase()
+
+    # Find the paid order for this person + event
+    order_row = (
+        supabase.table("ticket_order")
+        .select("*")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .eq("status", "paid")
+        .maybe_single()
+        .execute()
+    )
+    order = getattr(order_row, "data", None) if order_row else None
+    if not order:
+        raise ValueError("no_paid_order")
+
+    # Refund via Stripe if payment_intent is available
+    refunded = False
+    if order.get("stripe_payment_intent_id"):
+        stripe_payment.create_refund(order["stripe_payment_intent_id"])
+        refunded = True
+
+    # Mark order as refunded
+    supabase.table("ticket_order").update({
+        "status": "refunded",
+    }).eq("ticket_order_id", order["ticket_order_id"]).execute()
+
+    # Delete tickets linked to this order
+    supabase.table("ticket").delete().eq(
+        "ticket_order_id", order["ticket_order_id"]
+    ).execute()
+
+    # Also delete any tickets for this person+event without an order link
+    supabase.table("ticket").delete().eq(
+        "event_id", event_id
+    ).eq("person_id", person_id).execute()
+
+    # Update RSVP to Declined
+    participation = (
+        supabase.table("event_participation")
+        .select("event_participation_id")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .maybe_single()
+        .execute()
+    )
+    ep_data = getattr(participation, "data", None) if participation else None
+    if ep_data:
+        supabase.table("event_participation").update({"status": "Declined"}).eq(
+            "event_participation_id", ep_data["event_participation_id"]
+        ).execute()
+
+    # Restore ticket option quantity limit
+    if order.get("ticket_option_id"):
+        limit_row = (
+            supabase.table("ticket_option")
+            .select("quantity_limit")
+            .eq("ticket_option_id", order["ticket_option_id"])
+            .single()
+            .execute()
+        )
+        current_limit = (limit_row.data or {}).get("quantity_limit")
+        if current_limit is not None:
+            supabase.table("ticket_option").update({
+                "quantity_limit": current_limit + order["quantity"]
+            }).eq("ticket_option_id", order["ticket_option_id"]).execute()
+
+    logger.info("Cancelled order %s: refunded=%s", order["ticket_order_id"], refunded)
+    return {"refunded": refunded, "amount_cents": order["amount_total_cents"]}
+
+
 def get_payment_summary(event_id: str) -> dict:
     """Get aggregated payment stats for an event."""
     supabase = get_supabase()

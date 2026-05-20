@@ -188,6 +188,36 @@ async def create_checkout_session(
         raise HTTPException(status_code=code, detail=detail)
 
 
+# ── Cancel / Refund ───────────────────────────────────────────────────────────
+
+
+@router.post("/events/{event_id}/tickets/cancel")
+async def cancel_tickets(
+    event_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Cancel a user's tickets for an event and trigger a Stripe refund."""
+    token = credentials.credentials
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=token,
+    )
+    try:
+        result = payment_service.cancel_ticket_order(
+            event_id=event_id,
+            person_id=person["person_id"],
+        )
+        return result
+    except ValueError as e:
+        error_map = {
+            "no_paid_order": (404, "No active paid ticket order found for this event"),
+        }
+        code, detail = error_map.get(str(e), (400, str(e)))
+        raise HTTPException(status_code=code, detail=detail)
+
+
 # ── Webhooks ──────────────────────────────────────────────────────────────────
 
 
