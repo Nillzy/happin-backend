@@ -116,18 +116,18 @@ def _mock_chain(mock_supabase, data):
     table_mock.select.side_effect = select_side_effect
 
 
-def test_list_events_empty(client, mock_supabase):
+def test_list_events_empty(client, mock_supabase, auth_headers):
     _mock_chain(mock_supabase, [])
-    response = client.get("/api/v1/events/")
+    response = client.get("/api/v1/events/", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
     assert body["events"] == []
     assert body["count"] == 0
 
 
-def test_list_events_returns_data(client, mock_supabase):
+def test_list_events_returns_data(client, mock_supabase, auth_headers):
     _mock_chain(mock_supabase, [MOCK_EVENT_RAW])
-    response = client.get("/api/v1/events/")
+    response = client.get("/api/v1/events/", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
     assert body["count"] == 1

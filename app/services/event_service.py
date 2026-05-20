@@ -40,6 +40,7 @@ def get_public_events(
     limit: int = 50,
     offset: int = 0,
     person_id: str | None = None,
+    token: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
     categories: str | None = None,
@@ -54,7 +55,7 @@ def get_public_events(
     Filters applied at DB level: date_from, date_to, is_free, search (title ilike).
     Filters applied in Python post-fetch: city, categories (comma-separated OR logic).
     """
-    supabase = get_supabase()
+    supabase = get_supabase_for_user(token) if token else get_supabase()
     supabase_admin = get_supabase_admin()
     lower_bound = date_from if date_from else datetime.now(UTC).isoformat()
 
