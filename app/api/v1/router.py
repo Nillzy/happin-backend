@@ -1,7 +1,7 @@
 """API v1 main router - aggregates all sub-routers."""
 
 from fastapi import APIRouter
-from app.api.v1 import user, users, events, ticket_options, tickets, images, custom_fields
+from app.api.v1 import user, users, events, ticket_options, tickets, images, custom_fields, payments
 
 # Create main v1 router
 router = APIRouter(prefix="/api/v1")
@@ -26,6 +26,9 @@ router.include_router(images.router, prefix="/images", tags=["images"])
 
 # Include custom fields router (event form builder + guest responses)
 router.include_router(custom_fields.router, prefix="/events", tags=["custom-fields"])
+
+# Include payments router (Stripe Connect, checkout, webhooks, payouts)
+router.include_router(payments.router, tags=["payments"])
 
 
 @router.get("/health")

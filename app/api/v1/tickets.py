@@ -47,6 +47,18 @@ async def create_tickets(
         if not event_row.data:
             raise ValueError("event_not_found")
 
+        # Guard: paid ticket options must go through checkout
+        if body.ticket_option_id:
+            opt_row = (
+                supabase.table("ticket_option")
+                .select("price")
+                .eq("ticket_option_id", body.ticket_option_id)
+                .maybe_single()
+                .execute()
+            )
+            if opt_row.data and float(opt_row.data.get("price", 0)) > 0:
+                raise ValueError("payment_required")
+
         max_cap = event_row.data.get("max_capacity")
         if max_cap is not None:
             current_count = (
@@ -81,6 +93,7 @@ async def create_tickets(
             "event_not_found": (404, "Event not found"),
             "event_in_past": (400, "Event has already started"),
             "event_full": (409, "Event is fully booked"),
+            "payment_required": (400, "Paid tickets require checkout — use /checkout-session"),
         }
         code, detail = error_map.get(str(e), (400, str(e)))
         raise HTTPException(status_code=code, detail=detail)

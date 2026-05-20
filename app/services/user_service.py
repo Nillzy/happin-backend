@@ -103,16 +103,33 @@ def get_user_events(
                     if float(r.get("price", 0)) > 0
                 }
 
+            # Batch-load real revenue from paid ticket_orders
+            revenue_by_event: dict[str, int] = {}
+            if result_event_ids:
+                orders_rows = (
+                    supabase.table("ticket_order")
+                    .select("event_id, amount_total_cents")
+                    .in_("event_id", result_event_ids)
+                    .eq("status", "paid")
+                    .execute()
+                )
+                for r in (orders_rows.data or []):
+                    revenue_by_event[r["event_id"]] = (
+                        revenue_by_event.get(r["event_id"], 0) + r["amount_total_cents"]
+                    )
+
             for event in (result.data or []):
                 event["is_host"] = True
-                # Umsatz berechnen: Summe aller verkauften Tickets × Preis
-                tickets_sold = event.get("ticket", []) or []
-                revenue_cents = sum(
-                    int(float((t.get("ticket_option") or {}).get("price", 0)) * 100)
-                    for t in tickets_sold
-                    if t.get("ticket_option")
-                )
-                event["ticket_revenue_cents"] = revenue_cents
+                # Use actual paid revenue if available, fallback to catalog estimate
+                if event["event_id"] in revenue_by_event:
+                    event["ticket_revenue_cents"] = revenue_by_event[event["event_id"]]
+                else:
+                    tickets_sold = event.get("ticket", []) or []
+                    event["ticket_revenue_cents"] = sum(
+                        int(float((t.get("ticket_option") or {}).get("price", 0)) * 100)
+                        for t in tickets_sold
+                        if t.get("ticket_option")
+                    )
                 if event["event_id"] in paid_event_ids:
                     event["is_free"] = False
             events.extend(result.data or [])
