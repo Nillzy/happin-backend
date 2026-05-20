@@ -72,6 +72,30 @@ class TestFulfillmentIdempotency:
         assert result is False
 
 
+class TestCancelTicketOrder:
+    @patch("app.services.payment_service.stripe_payment.create_refund")
+    @patch("app.services.payment_service._resolve_payment_intent_id", return_value=None)
+    @patch("app.services.payment_service.get_supabase")
+    def test_cancel_without_payment_intent_raises(
+        self, mock_get_supabase, _mock_resolve_pi, _mock_refund
+    ):
+        mock_sb = MagicMock()
+        mock_get_supabase.return_value = mock_sb
+        paid = MagicMock()
+        paid.data = [{
+            "ticket_order_id": "order-1",
+            "amount_total_cents": 1000,
+            "ticket_option_id": None,
+            "quantity": 1,
+        }]
+        mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = paid
+
+        from app.services.payment_service import cancel_ticket_order
+
+        with pytest.raises(ValueError, match="refund_not_possible"):
+            cancel_ticket_order("e1", "p1")
+
+
 class TestCheckoutValidation:
     @patch("app.services.payment_service.get_host_stripe_account")
     @patch("app.services.payment_service.get_supabase")

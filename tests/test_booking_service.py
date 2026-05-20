@@ -1,5 +1,6 @@
 """Tests for shared booking validation."""
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -44,6 +45,23 @@ def _mock_supabase_for_validate(*, event_id: str, max_capacity: int | None, max_
 
     mock_sb.table.side_effect = table_side_effect
     return mock_sb
+
+
+class TestExpireStalePendingOrders:
+    def test_expires_order_without_checkout_session(self):
+        mock_sb = MagicMock()
+        pending = MagicMock()
+        pending.data = [{
+            "ticket_order_id": "ord-stale",
+            "stripe_checkout_session_id": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }]
+        mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.execute.return_value = pending
+        update_chain = mock_sb.table.return_value.update.return_value.eq.return_value.eq.return_value
+
+        booking_service.expire_stale_pending_orders(mock_sb, "event-a", "p1")
+
+        update_chain.execute.assert_called_once()
 
 
 class TestValidateBooking:

@@ -130,27 +130,30 @@ def create_checkout_session(
         "person_id": person_id,
     }
 
-    session = stripe_payment.create_checkout_session(
-        line_items=[{
-            "price_data": {
-                "currency": "eur",
-                "product_data": {"name": product_name},
-                "unit_amount": unit_price_cents,
-            },
-            "quantity": quantity,
-        }],
-        destination_account_id=destination_account,
-        application_fee_amount=fee_cents,
-        success_url=success_url,
-        cancel_url=cancel_url,
-        metadata=order_metadata,
-        customer_email=person_email,
-        idempotency_key=order_id,
-    )
-
-    supabase.table("ticket_order").update({
-        "stripe_checkout_session_id": session.id,
-    }).eq("ticket_order_id", order_id).execute()
+    try:
+        session = stripe_payment.create_checkout_session(
+            line_items=[{
+                "price_data": {
+                    "currency": "eur",
+                    "product_data": {"name": product_name},
+                    "unit_amount": unit_price_cents,
+                },
+                "quantity": quantity,
+            }],
+            destination_account_id=destination_account,
+            application_fee_amount=fee_cents,
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata=order_metadata,
+            customer_email=person_email,
+            idempotency_key=order_id,
+        )
+        supabase.table("ticket_order").update({
+            "stripe_checkout_session_id": session.id,
+        }).eq("ticket_order_id", order_id).execute()
+    except Exception:
+        expire_ticket_order(order_id)
+        raise
 
     return {"checkout_url": session.url, "ticket_order_id": order_id}
 
@@ -166,8 +169,27 @@ def _order_has_tickets(svc, order_id: str) -> bool:
     return bool(rows.data)
 
 
+def _resolve_payment_intent_id(order: dict) -> str | None:
+    """Payment intent from order row or Stripe Checkout session."""
+    pi = order.get("stripe_payment_intent_id")
+    if pi:
+        return pi
+    session_id = order.get("stripe_checkout_session_id")
+    if not session_id:
+        return None
+    session = stripe_payment.retrieve_checkout_session(session_id)
+    pi = getattr(session, "payment_intent", None)
+    if pi is None and isinstance(session, dict):
+        pi = session.get("payment_intent")
+    if isinstance(pi, str):
+        return pi
+    if pi is not None:
+        return getattr(pi, "id", None) or str(pi)
+    return None
+
+
 def fulfill_ticket_order(order_id: str, payment_intent_id: str | None = None) -> bool:
-    """Fulfill a ticket order: create tickets + RSVP, then mark paid. Idempotent."""
+    """Fulfill a ticket order: claim paid status, then create tickets. Idempotent."""
     supabase = get_supabase()
 
     order_row = (
@@ -189,14 +211,7 @@ def fulfill_ticket_order(order_id: str, payment_intent_id: str | None = None) ->
     if status not in ("pending", "paid"):
         return False
 
-    ticket_service.create_tickets_for_order(
-        supabase,
-        ticket_order_id=order_id,
-        event_id=order["event_id"],
-        person_id=order["person_id"],
-        ticket_option_id=order.get("ticket_option_id"),
-        quantity=order["quantity"],
-    )
+    should_create_tickets = False
 
     if status == "pending":
         update_data: dict = {
@@ -205,13 +220,44 @@ def fulfill_ticket_order(order_id: str, payment_intent_id: str | None = None) ->
         }
         if payment_intent_id:
             update_data["stripe_payment_intent_id"] = payment_intent_id
-        supabase.table("ticket_order").update(update_data).eq(
-            "ticket_order_id", order_id
-        ).execute()
-    elif payment_intent_id and not order.get("stripe_payment_intent_id"):
-        supabase.table("ticket_order").update({
-            "stripe_payment_intent_id": payment_intent_id,
-        }).eq("ticket_order_id", order_id).execute()
+        claimed = (
+            supabase.table("ticket_order")
+            .update(update_data)
+            .eq("ticket_order_id", order_id)
+            .eq("status", "pending")
+            .execute()
+        )
+        should_create_tickets = bool(claimed.data)
+        if not should_create_tickets:
+            order_row = (
+                supabase.table("ticket_order")
+                .select("*")
+                .eq("ticket_order_id", order_id)
+                .single()
+                .execute()
+            )
+            order = order_row.data
+            if order["status"] == "paid" and _order_has_tickets(supabase, order_id):
+                return False
+            should_create_tickets = order["status"] == "paid" and not _order_has_tickets(
+                supabase, order_id
+            )
+    else:
+        if payment_intent_id and not order.get("stripe_payment_intent_id"):
+            supabase.table("ticket_order").update({
+                "stripe_payment_intent_id": payment_intent_id,
+            }).eq("ticket_order_id", order_id).execute()
+        should_create_tickets = not _order_has_tickets(supabase, order_id)
+
+    if should_create_tickets:
+        ticket_service.create_tickets_for_order(
+            supabase,
+            ticket_order_id=order_id,
+            event_id=order["event_id"],
+            person_id=order["person_id"],
+            ticket_option_id=order.get("ticket_option_id"),
+            quantity=order["quantity"],
+        )
 
     logger.info("Fulfilled order %s", order_id)
     return True
@@ -257,70 +303,78 @@ def fail_ticket_order(order_id: str) -> None:
 
 
 def cancel_ticket_order(event_id: str, person_id: str) -> dict:
-    """Cancel a paid ticket order: Stripe refund first, then DB updates."""
+    """Cancel the latest paid ticket order: Stripe refund first, then DB updates."""
     supabase = get_supabase()
 
-    order_row = (
+    paid_rows = (
         supabase.table("ticket_order")
         .select("*")
         .eq("event_id", event_id)
         .eq("person_id", person_id)
         .eq("status", "paid")
-        .maybe_single()
+        .order("paid_at", desc=True)
+        .limit(1)
         .execute()
     )
-    order = getattr(order_row, "data", None) if order_row else None
+    order = (paid_rows.data or [None])[0]
     if not order:
-        refunded_row = (
+        refunded_rows = (
             supabase.table("ticket_order")
             .select("amount_total_cents")
             .eq("event_id", event_id)
             .eq("person_id", person_id)
             .eq("status", "refunded")
-            .maybe_single()
+            .order("paid_at", desc=True)
+            .limit(1)
             .execute()
         )
-        prev = getattr(refunded_row, "data", None) if refunded_row else None
+        prev = (refunded_rows.data or [None])[0]
         if prev:
             return {"refunded": True, "amount_cents": prev["amount_total_cents"]}
         raise ValueError("no_paid_order")
 
     order_id = order["ticket_order_id"]
-    payment_intent_id = order.get("stripe_payment_intent_id")
+    payment_intent_id = _resolve_payment_intent_id(order)
+    if not payment_intent_id:
+        raise ValueError("refund_not_possible")
 
-    if payment_intent_id:
-        refund = stripe_payment.create_refund(
-            payment_intent_id,
-            idempotency_key=f"refund-{order_id}",
-        )
-        refund_status = getattr(refund, "status", None) or refund.get("status")
-        if refund_status not in ("succeeded", "pending"):
-            raise ValueError("refund_failed")
+    refund = stripe_payment.create_refund(
+        payment_intent_id,
+        idempotency_key=f"refund-{order_id}",
+    )
+    refund_status = getattr(refund, "status", None) or refund.get("status")
+    if refund_status not in ("succeeded", "pending"):
+        raise ValueError("refund_failed")
 
     supabase.table("ticket_order").update({
         "status": "refunded",
+        "stripe_payment_intent_id": payment_intent_id,
     }).eq("ticket_order_id", order_id).eq("status", "paid").execute()
 
     supabase.table("ticket").delete().eq("ticket_order_id", order_id).execute()
 
-    # Also delete any tickets for this person+event without an order link
-    supabase.table("ticket").delete().eq(
-        "event_id", event_id
-    ).eq("person_id", person_id).execute()
-
-    participation = (
-        supabase.table("event_participation")
-        .select("event_participation_id")
+    remaining_tickets = (
+        supabase.table("ticket")
+        .select("ticket_id")
         .eq("event_id", event_id)
         .eq("person_id", person_id)
-        .maybe_single()
+        .limit(1)
         .execute()
     )
-    ep_data = getattr(participation, "data", None) if participation else None
-    if ep_data:
-        supabase.table("event_participation").update({"status": "Declined"}).eq(
-            "event_participation_id", ep_data["event_participation_id"]
-        ).execute()
+    if not remaining_tickets.data:
+        participation = (
+            supabase.table("event_participation")
+            .select("event_participation_id")
+            .eq("event_id", event_id)
+            .eq("person_id", person_id)
+            .maybe_single()
+            .execute()
+        )
+        ep_data = getattr(participation, "data", None) if participation else None
+        if ep_data:
+            supabase.table("event_participation").update({"status": "Declined"}).eq(
+                "event_participation_id", ep_data["event_participation_id"]
+            ).execute()
 
     if order.get("ticket_option_id"):
         limit_row = (
@@ -338,7 +392,7 @@ def cancel_ticket_order(event_id: str, person_id: str) -> dict:
 
     logger.info("Cancelled order %s", order_id)
     return {
-        "refunded": bool(payment_intent_id),
+        "refunded": True,
         "amount_cents": order["amount_total_cents"],
     }
 
