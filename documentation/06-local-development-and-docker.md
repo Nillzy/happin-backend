@@ -62,16 +62,18 @@ supabase --version
 
 ### Grundlegende Befehle
 
-| Befehl | Was er tut |
-|--------|------------|
-| `supabase login` | Authentifiziert die CLI mit deinem Supabase-Account |
-| `supabase link --project-ref <ref>` | Verknüpft das lokale Repo mit einem Remote-Projekt |
-| `supabase projects list` | Zeigt alle Projekte deines Accounts |
-| `supabase db pull` | Zieht das aktuelle Remote-Schema als neue Migration |
-| `supabase db push` | Wendet lokale Migrations auf die Remote-DB an |
-| `supabase migration list` | Zeigt den Status aller Migrations (lokal vs. remote) |
-| `supabase migration new <name>` | Erstellt eine leere Migration-Datei |
-| `supabase migration repair --status applied <version>` | Markiert eine Migration manuell als applied |
+
+| Befehl                                                 | Was er tut                                           |
+| ------------------------------------------------------ | ---------------------------------------------------- |
+| `supabase login`                                       | Authentifiziert die CLI mit deinem Supabase-Account  |
+| `supabase link --project-ref <ref>`                    | Verknüpft das lokale Repo mit einem Remote-Projekt   |
+| `supabase projects list`                               | Zeigt alle Projekte deines Accounts                  |
+| `supabase db pull`                                     | Zieht das aktuelle Remote-Schema als neue Migration  |
+| `supabase db push`                                     | Wendet lokale Migrations auf die Remote-DB an        |
+| `supabase migration list`                              | Zeigt den Status aller Migrations (lokal vs. remote) |
+| `supabase migration new <name>`                        | Erstellt eine leere Migration-Datei                  |
+| `supabase migration repair --status applied <version>` | Markiert eine Migration manuell als applied          |
+
 
 ### Migrations — wie sie funktionieren
 
@@ -88,33 +90,33 @@ Das vergleicht das Remote-Schema mit dem lokalen Stand und erzeugt eine neue Mig
 **Lokale Änderungen schreiben:**
 
 1. Neue Migration erstellen:
-   ```bash
+  ```bash
    supabase migration new add_ratings_table
-   ```
+  ```
    Das erzeugt eine leere Datei, z.B. `supabase/migrations/20260428150000_add_ratings_table.sql`.
-
 2. SQL eintragen (CREATE TABLE, ALTER TABLE, etc.)
-
 3. Auf die Remote-DB anwenden:
-   ```bash
+  ```bash
    supabase db push
-   ```
+  ```
 
 **Typischer Workflow im Team:**
 
 1. `git pull` — lokale Migrations aktuell halten
 2. Schema-Änderung entweder:
-   - Im Supabase Dashboard machen → `supabase db pull` zum Runterladen
-   - Oder lokal als Migration-SQL schreiben → `supabase db push` zum Hochladen
+  - Im Supabase Dashboard machen → `supabase db pull` zum Runterladen
+  - Oder lokal als Migration-SQL schreiben → `supabase db push` zum Hochladen
 3. Migration-Datei committen und pushen
 4. Andere Teammitglieder: `git pull` → `supabase db push` um ihr Remote-Schema zu synchronisieren
 
 **Wenn Migrations nicht übereinstimmen:**
 
 Falls `supabase db pull` mit einem History-Mismatch fehlschlägt:
+
 ```bash
 supabase migration repair --status applied <version>
 ```
+
 Das markiert die genannte Version in der Remote-History als "applied", ohne sie nochmal auszuführen.
 
 **Ordnerstruktur:**
@@ -151,67 +153,60 @@ Wenn du die Frontend-App auf einem physischen Gerät testen willst (z.B. via Exp
 ngrok erstellt einen öffentlichen Tunnel zu deinem lokalen Backend und umgeht Firewall-Probleme:
 
 1. **Backend auf 0.0.0.0 starten** (akzeptiert externe Verbindungen):
-   ```bash
+  ```bash
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
-   ```
-
+  ```
 2. **ngrok Tunnel starten** (separates Terminal):
-   ```bash
+  ```bash
    ngrok http 8001
-   ```
-   
+  ```
    Output:
-   ```
-   Forwarding  https://abc-xyz-123.ngrok-free.dev -> http://localhost:8001
-   ```
-
 3. **Frontend `.env.local` aktualisieren**:
-   ```
+  ```
    EXPO_PUBLIC_BACKEND_URL=https://abc-xyz-123.ngrok-free.dev
-   ```
-
+  ```
 4. **Frontend neu starten** (damit neue URL geladen wird)
 
 **Hinweis:** Die ngrok-URL ändert sich bei jedem Neustart. Für eine feste URL brauchst du einen kostenpflichtigen ngrok-Account.
 
 **Vorteile:**
+
 - Funktioniert immer (umgeht Firewall)
 - Kein Netzwerk-Setup nötig
 - Auch außerhalb des lokalen WLANs nutzbar
 
 **Nachteile:**
+
 - Langsamer als direkte Verbindung (~100-300ms Latenz)
 - URL ändert sich bei jedem Neustart
 
 #### Option 2: Lokale IP-Adresse (schneller, erfordert Firewall-Konfiguration)
 
 1. **Backend auf 0.0.0.0 starten**:
-   ```bash
+  ```bash
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
-   ```
-
+  ```
 2. **Mac IP-Adresse finden**:
-   ```bash
+  ```bash
    ifconfig | grep "inet " | grep -v 127.0.0.1
-   ```
+  ```
    Beispiel: `172.16.73.155`
-
 3. **macOS Firewall konfigurieren**:
-   - **Systemeinstellungen → Netzwerk → Firewall → Optionen**
-   - Python hinzufügen und eingehende Verbindungen erlauben
-
+  - **Systemeinstellungen → Netzwerk → Firewall → Optionen**
+  - Python hinzufügen und eingehende Verbindungen erlauben
 4. **Frontend `.env.local` aktualisieren**:
-   ```
+  ```
    EXPO_PUBLIC_BACKEND_URL=http://172.16.73.155:8001
-   ```
-
+  ```
 5. **Mac und Gerät im gleichen WLAN**
 
 **Vorteile:**
+
 - Schneller als ngrok (keine zusätzliche Latenz)
 - Stabile URL (ändert sich nur, wenn sich die IP ändert)
 
 **Nachteile:**
+
 - Firewall muss konfiguriert werden
 - Nur im gleichen WLAN nutzbar
 

@@ -129,6 +129,15 @@ def retrieve_balance(account_id: str) -> Any:
     return client.v1.balance.retrieve(options={"stripe_account": account_id})
 
 
+def create_refund(payment_intent_id: str, amount: int | None = None) -> Any:
+    """Create a refund for a payment intent (full or partial)."""
+    client = get_stripe_client()
+    params: dict[str, Any] = {"payment_intent": payment_intent_id}
+    if amount is not None:
+        params["amount"] = amount
+    return client.v1.refunds.create(params=params)
+
+
 def create_payout(account_id: str, amount: int, currency: str = "eur") -> Any:
     """Create a payout to the connected account's bank."""
     client = get_stripe_client()
