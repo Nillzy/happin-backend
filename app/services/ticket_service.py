@@ -86,14 +86,23 @@ def create_tickets_for_order(
     guest_names: list[str] | None = None,
 ) -> list[dict]:
     """Create tickets for a paid order (admin client). Idempotent per order_id."""
-    existing = (
+    order_ticket_count = (
         supabase.table("ticket")
-        .select("ticket_id")
+        .select("ticket_id", count="exact")
         .eq("ticket_order_id", ticket_order_id)
         .execute()
     )
-    if existing.data:
-        return existing.data
+    already_for_order = order_ticket_count.count or 0
+    if already_for_order >= quantity:
+        existing = (
+            supabase.table("ticket")
+            .select("ticket_id")
+            .eq("ticket_order_id", ticket_order_id)
+            .execute()
+        )
+        return existing.data or []
+
+    to_create = quantity - already_for_order
 
     guest_name = _resolve_guest_name(supabase, person_id, guest_name)
     ticket_option_name = _resolve_option_name(supabase, ticket_option_id, None)
@@ -112,11 +121,11 @@ def create_tickets_for_order(
         guest_names = [f"{base} {i + 1}" for i in range(quantity)]
 
     payloads = []
-    for i in range(quantity):
+    for i in range(to_create):
         ticket_nr = existing_count + i + 1
         name = (
-            guest_names[i].strip()
-            if guest_names and i < len(guest_names)
+            guest_names[already_for_order + i].strip()
+            if guest_names and (already_for_order + i) < len(guest_names)
             else guest_name
         ) or "Gast"
         qr_token = generate_ticket_token(event_id, name, ticket_nr, ticket_option_name)

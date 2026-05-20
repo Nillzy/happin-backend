@@ -246,6 +246,7 @@ async def cancel_tickets(
     except ValueError as e:
         error_map = {
             "no_paid_order": (404, "No active paid ticket order found for this event"),
+            "refund_not_possible": (502, "Payment cannot be refunded. Contact support."),
             "refund_failed": (502, "Refund could not be processed. Please try again later."),
         }
         code, detail = error_map.get(str(e), (400, str(e)))
@@ -330,10 +331,14 @@ def _handle_checkout_expired(session) -> None:
 
 
 def _handle_payment_intent_succeeded(payment_intent) -> None:
-    """Fallback fulfillment from PaymentIntent metadata."""
+    """Store payment intent on order; fulfillment is via checkout session webhooks."""
     order_id = (payment_intent.metadata or {}).get("ticket_order_id")
-    if order_id:
-        payment_service.fulfill_ticket_order(order_id, payment_intent_id=payment_intent.id)
+    if not order_id:
+        return
+    supabase = get_supabase_admin()
+    supabase.table("ticket_order").update({
+        "stripe_payment_intent_id": payment_intent.id,
+    }).eq("ticket_order_id", order_id).is_("stripe_payment_intent_id", "null").execute()
 
 
 def _handle_account_updated(account) -> None:
@@ -425,21 +430,27 @@ async def request_payout(
         .single()
         .execute()
     )
-    starts_at = datetime.fromisoformat(event_row.data["starts_at"])
+    starts_at_raw = event_row.data["starts_at"]
+    starts_at = datetime.fromisoformat(str(starts_at_raw).replace("Z", "+00:00"))
+    if starts_at.tzinfo is None:
+        starts_at = starts_at.replace(tzinfo=timezone.utc)
     if starts_at > datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Event has not ended yet")
 
-    # Get host Stripe account
+    payout_host = payment_service.get_host_stripe_account(event_id)
+    if not payout_host:
+        raise HTTPException(status_code=400, detail="No payout recipient configured for this event")
+    account_id = payout_host.get("stripe_connect_account_id")
+    if not account_id:
+        raise HTTPException(status_code=400, detail="No Stripe account connected")
+
     person_row = (
         supabase.table("person")
-        .select("stripe_connect_account_id, stripe_connect_payouts_enabled")
-        .eq("person_id", person["person_id"])
+        .select("stripe_connect_payouts_enabled")
+        .eq("person_id", payout_host["person_id"])
         .single()
         .execute()
     )
-    account_id = person_row.data.get("stripe_connect_account_id")
-    if not account_id:
-        raise HTTPException(status_code=400, detail="No Stripe account connected")
     if not person_row.data.get("stripe_connect_payouts_enabled"):
         raise HTTPException(status_code=400, detail="Payouts not enabled on account")
 

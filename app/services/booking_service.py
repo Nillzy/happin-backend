@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
+
+# Stripe Checkout sessions expire after 30 min; allow a small buffer.
+PENDING_ORDER_TTL_MINUTES = 35
 
 
 class SupabaseClient(Protocol):
@@ -114,9 +118,41 @@ def user_has_paid_purchase(
     return bool(linked.data)
 
 
+def expire_stale_pending_orders(
+    supabase: SupabaseClient, event_id: str, person_id: str
+) -> None:
+    """Expire abandoned pending orders (no session or past checkout TTL)."""
+    rows = (
+        supabase.table("ticket_order")
+        .select("ticket_order_id, stripe_checkout_session_id, created_at")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .eq("status", "pending")
+        .execute()
+    )
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=PENDING_ORDER_TTL_MINUTES)
+    for row in rows.data or []:
+        created_raw = row.get("created_at")
+        created_at = None
+        if created_raw:
+            created_at = datetime.fromisoformat(
+                str(created_raw).replace("Z", "+00:00")
+            )
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+        stale = not row.get("stripe_checkout_session_id")
+        if created_at and created_at < cutoff:
+            stale = True
+        if stale:
+            supabase.table("ticket_order").update({"status": "expired"}).eq(
+                "ticket_order_id", row["ticket_order_id"]
+            ).eq("status", "pending").execute()
+
+
 def user_has_pending_checkout(
     supabase: SupabaseClient, event_id: str, person_id: str
 ) -> bool:
+    expire_stale_pending_orders(supabase, event_id, person_id)
     row = (
         supabase.table("ticket_order")
         .select("ticket_order_id")
@@ -144,6 +180,9 @@ def validate_booking(
     Returns ticket option row when ticket_option_id is set.
     Raises ValueError with stable error codes.
     """
+    if is_checkout:
+        expire_stale_pending_orders(supabase, event_id, person_id)
+
     event_row = (
         supabase.table("event")
         .select("max_capacity")
