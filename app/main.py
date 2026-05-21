@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.api.v1.router import router as api_v1_router
 from app.core.config import settings
+from app.services.reminder_scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(
     level=logging.INFO if not settings.DEBUG else logging.DEBUG,
@@ -21,8 +22,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Happin Backend API")
     logger.info(f"Debug mode: {settings.DEBUG}")
     logger.info(f"Supabase URL: {settings.SUPABASE_URL}")
+    start_scheduler()
     logger.info("Application startup complete")
     yield
+    stop_scheduler()
     logger.info("Shutting down Happin Backend API")
 
 

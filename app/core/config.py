@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     GOOGLE_WALLET_ISSUER_ID: str | None = None
     GOOGLE_SERVICE_ACCOUNT_FILE: str | None = None
 
+    # Web Push (VAPID) — Reminders (Anforderung K4)
+    VAPID_PUBLIC_KEY: str | None = None
+    VAPID_PRIVATE_KEY: str | None = None
+    VAPID_SUBJECT: str = "mailto:admin@happin.fun"
+    REMINDER_SCHEDULER_ENABLED: bool = True
+    REMINDER_SCHEDULER_INTERVAL_SECONDS: int = 60
+
 
 # Global settings instance
 settings = Settings()
