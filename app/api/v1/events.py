@@ -85,6 +85,8 @@ def _to_list_item(raw: dict) -> EventListItem:
         is_deleted=raw.get("deleted_at") is not None,
         deleted_at=raw.get("deleted_at"),
         location_is_private=raw.get("location_is_private", False),
+        accent_color_primary=raw.get("accent_color_primary"),
+        accent_color_secondary=raw.get("accent_color_secondary"),
     )
 
 
@@ -201,6 +203,8 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         is_deleted=raw.get("deleted_at") is not None,
         deleted_at=raw.get("deleted_at"),
         location_is_private=raw.get("location_is_private", False),
+        accent_color_primary=raw.get("accent_color_primary"),
+        accent_color_secondary=raw.get("accent_color_secondary"),
     )
 
 
