@@ -1,10 +1,19 @@
 """Event-related Pydantic schemas."""
 
+import re
 from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Literal, Optional
 from datetime import datetime
 from app.schemas.ticket_options import TicketOptionResponse
 from app.schemas.custom_fields import CustomFieldResponse
+
+_HEX_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
+
+
+def _validate_hex_color(v: str | None) -> str | None:
+    if v is not None and not _HEX_RE.match(v):
+        raise ValueError("Farbe muss ein 6-stelliger Hex-Wert sein, z.B. #D4006B")
+    return v
 
 
 class LocationCreate(BaseModel):
@@ -42,6 +51,8 @@ class EventCreate(BaseModel):
     status: str = "published"
     image_url: str | None = None
     gradient_id: int | None = None
+    accent_color_primary: str | None = None
+    accent_color_secondary: str | None = None
     location_is_private: bool = False
 
     @field_validator("title")
@@ -75,6 +86,16 @@ class EventCreate(BaseModel):
             raise ValueError("status must be 'draft' or 'published'")
         return v
 
+    @field_validator("accent_color_primary")
+    @classmethod
+    def validate_primary_color(cls, v: str | None) -> str | None:
+        return _validate_hex_color(v)
+
+    @field_validator("accent_color_secondary")
+    @classmethod
+    def validate_secondary_color(cls, v: str | None) -> str | None:
+        return _validate_hex_color(v)
+
 
 class LocationUpdate(BaseModel):
     city: str | None = None
@@ -102,6 +123,8 @@ class EventUpdate(BaseModel):
     gradient_id: int | None = None
     media_urls: list[str] | None = None
     location_is_private: bool | None = None
+    accent_color_primary: str | None = None
+    accent_color_secondary: str | None = None
 
     @field_validator("title")
     @classmethod
@@ -127,6 +150,16 @@ class EventUpdate(BaseModel):
         if v is not None and v not in ("draft", "published"):
             raise ValueError("status must be 'draft' or 'published'")
         return v
+
+    @field_validator("accent_color_primary")
+    @classmethod
+    def validate_update_primary_color(cls, v: str | None) -> str | None:
+        return _validate_hex_color(v)
+
+    @field_validator("accent_color_secondary")
+    @classmethod
+    def validate_update_secondary_color(cls, v: str | None) -> str | None:
+        return _validate_hex_color(v)
 
 
 class LocationResponse(BaseModel):
@@ -169,6 +202,8 @@ class EventListItem(BaseModel):
     is_deleted: bool = False
     deleted_at: datetime | None = None
     location_is_private: bool = False
+    accent_color_primary: str | None = None
+    accent_color_secondary: str | None = None
 
 
 class EventListResponse(BaseModel):
