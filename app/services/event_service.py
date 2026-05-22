@@ -556,6 +556,8 @@ def get_event_participants(event_id: str, token: str) -> dict:
         responses_by_person[pid].append({
             "ticket_id": t["ticket_id"],
             "guest_name": t.get("guest_name"),
+            "ticket_option_id": opt.get("ticket_option_id"),
+            "ticket_option_name": opt_name,
             "responses": t.get("custom_field_response") or [],
         })
 
