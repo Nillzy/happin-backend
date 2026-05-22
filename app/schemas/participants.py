@@ -22,6 +22,8 @@ class CustomFieldResponseItem(BaseModel):
 class TicketResponsesItem(BaseModel):
     ticket_id: str
     guest_name: str | None = None
+    ticket_option_id: str | None = None
+    ticket_option_name: str | None = None
     responses: list[CustomFieldResponseItem] = []
 
 

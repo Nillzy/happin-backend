@@ -412,6 +412,8 @@ async def get_participants(
                 TicketResponsesItem(
                     ticket_id=tr["ticket_id"],
                     guest_name=tr.get("guest_name"),
+                    ticket_option_id=tr.get("ticket_option_id"),
+                    ticket_option_name=tr.get("ticket_option_name"),
                     responses=[
                         CustomFieldResponseItem(
                             custom_field_id=r["custom_field_id"],
