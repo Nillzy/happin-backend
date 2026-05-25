@@ -21,6 +21,9 @@ def sync_ticket_options(event_id: str, options: list[dict], token: str) -> list[
     - Items with ticket_option_id → UPDATE
     - Items without ticket_option_id → INSERT
     - Existing IDs not in request → DELETE
+
+    Synchronisiert anschließend `event.is_free` mit dem tatsächlichen Preis-Zustand:
+    mindestens eine Option mit Preis > 0 ⇒ `is_free=False`, sonst `True`.
     """
     supabase = get_supabase_for_user(token)
 
@@ -61,4 +64,13 @@ def sync_ticket_options(event_id: str, options: list[dict], token: str) -> list[
         else:
             supabase.table("ticket_option").insert(row).execute()
 
-    return get_ticket_options(event_id)
+    result = get_ticket_options(event_id)
+    _sync_event_is_free(supabase, event_id, result)
+    return result
+
+
+def _sync_event_is_free(supabase, event_id: str, options: list[dict]) -> None:
+    has_paid = any(float(opt.get("price", 0) or 0) > 0 for opt in options)
+    supabase.table("event").update({"is_free": not has_paid}).eq(
+        "event_id", event_id
+    ).execute()
