@@ -59,6 +59,18 @@ def get_public_events(
     supabase_admin = get_supabase_admin()
     lower_bound = date_from if date_from else datetime.now(UTC).isoformat()
 
+    paid_event_ids_filter: list[str] = []
+    if is_free is True:
+        paid_filter_resp = (
+            supabase_admin.table("ticket_option")
+            .select("event_id")
+            .gt("price", 0)
+            .execute()
+        )
+        paid_event_ids_filter = list(
+            {row["event_id"] for row in (paid_filter_resp.data or [])}
+        )
+
     # Count query (same filters as paginated query, excluding pagination-only args)
     count_q = (
         supabase.table("event")
@@ -72,8 +84,10 @@ def get_public_events(
         count_q = count_q.lte("starts_at", date_to)
     if is_free is True:
         count_q = count_q.eq("is_free", True)
+        if paid_event_ids_filter:
+            count_q = count_q.not_.in_("event_id", paid_event_ids_filter)
     if search:
-        search_pattern = f"%{search.strip()}%".replace("%", "%25")
+        search_pattern = f"%{search.strip()}%"
         count_q = count_q.ilike("title", search_pattern)
     count_response = count_q.execute()
     total_count = count_response.count if hasattr(count_response, "count") else 0
@@ -95,8 +109,10 @@ def get_public_events(
         q = q.lte("starts_at", date_to)
     if is_free is True:
         q = q.eq("is_free", True)
+        if paid_event_ids_filter:
+            q = q.not_.in_("event_id", paid_event_ids_filter)
     if search:
-        search_pattern = f"%{search.strip()}%".replace("%", "%25")
+        search_pattern = f"%{search.strip()}%"
         q = q.ilike("title", search_pattern)
     q = q.order("starts_at", desc=False).range(offset, offset + limit - 1)
     response = q.execute()
