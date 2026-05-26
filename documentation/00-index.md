@@ -28,6 +28,7 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [19-events-filter.md](19-events-filter.md) | Events API filter parameters: date range, category, city, is_free |
 | [20-event-soft-delete.md](20-event-soft-delete.md) | Event Soft-Delete: `deleted_at`-Feld, Sichtbarkeitsregeln, DELETE-Endpoint |
 | [21-erinnerungen-k4.md](21-erinnerungen-k4.md) | Erinnerungen (K4): Tabellen, REST-Endpoints, APScheduler + pywebpush, VAPID-Setup |
+| [22-rsvp-export.md](22-rsvp-export.md) | Gästelisten-Export (S8): CSV + PDF, Host-only, Filter accepted, eine Zeile pro Ticket |
 
 ## Neue Dokumentation hinzufügen
 
