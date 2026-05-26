@@ -165,6 +165,64 @@ def get_public_events(
 
     return events, total_count
 
+def get_public_events_by_host(host_person_id: str, limit: int = 50, offset: int = 0, token: str | None = None) -> tuple[list[dict], int]:
+    """Get all public events organized by a specific host."""
+    supabase = get_supabase_for_user(token) if token else get_supabase()
+    supabase_admin = get_supabase_admin()
+    lower_bound = datetime.now(UTC).isoformat()
+
+    # Count query
+    count_q = (
+        supabase.table("event")
+        .select("event_id, event_host!inner(person_id)", count="exact")
+        .eq("is_public", True)
+        .eq("status", "published")
+        .eq("event_host.person_id", host_person_id)
+        .gte("starts_at", lower_bound)
+        .filter("deleted_at", "is", "null")
+    )
+    count_response = count_q.execute()
+    total_count = count_response.count if hasattr(count_response, "count") else 0
+
+    # Paginated events query
+    q = (
+        supabase.table("event")
+        .select(
+            "*, location(*), event_media(media_url), "
+            "event_host!inner(person_id), "
+            "ticket(ticket_id)"
+        )
+        .eq("is_public", True)
+        .eq("status", "published")
+        .eq("event_host.person_id", host_person_id)
+        .gte("starts_at", lower_bound)
+        .filter("deleted_at", "is", "null")
+        .order("starts_at", desc=False)
+        .range(offset, offset + limit - 1)
+    )
+    response = q.execute()
+
+    events = response.data if response.data else []
+    if not events:
+        return events, total_count
+
+    # Load ticket prices for is_free determination
+    event_ids = [e["event_id"] for e in events]
+    opts_response = supabase_admin.table("ticket_option").select("event_id, price").in_("event_id", event_ids).execute()
+    paid_event_ids = {
+        row["event_id"]
+        for row in (opts_response.data or [])
+        if float(row.get("price", 0)) > 0
+    }
+
+    for event in events:
+        event["is_host"] = True  # All events in this list are hosted by the requested person
+        if event["event_id"] in paid_event_ids:
+            event["is_free"] = False
+        _strip_location_for_privacy(event, None)
+
+    return events, total_count
+
 def get_public_events_count() -> int:
     supabase = get_supabase()
 
