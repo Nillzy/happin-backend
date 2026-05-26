@@ -1,6 +1,7 @@
 """Event endpoints for listing, viewing, and creating events."""
 
 import logging
+from datetime import datetime
 
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,6 +32,8 @@ from app.services import user_service
 from app.services import ticket_service
 from app.services import calendar_service
 from app.services import google_wallet_service
+from app.services import custom_field_service
+from app.services.export import export_service, csv_renderer, pdf_renderer
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -597,3 +600,75 @@ async def get_event_wallet_link(
         raise HTTPException(status_code=404, detail="Event not found")
 
     return {"wallet_url": wallet_link}
+
+
+@router.get("/{event_id}/export")
+async def export_guest_list(
+    event_id: str,
+    format: Literal["csv", "pdf"] = Query(...),
+    include_rsvp_responses: bool = Query(False),
+    user=Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+):
+    """Export the guest list (only accepted participants) as CSV or PDF.
+
+    Host-only. One row per ticket, sorted by buyer (last name, first name,
+    ticket option). Telefonnummern werden bewusst NICHT exportiert.
+    """
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=credentials.credentials,
+    )
+    person_id = person["person_id"]
+
+    if not event_service.is_user_host(event_id=event_id, person_id=person_id):
+        raise HTTPException(
+            status_code=403, detail="Only the host can export the guest list"
+        )
+
+    data = event_service.get_event_participants(
+        event_id=event_id, token=credentials.credentials
+    )
+    custom_fields = (
+        custom_field_service.get_custom_fields(event_id=event_id)
+        if include_rsvp_responses
+        else []
+    )
+
+    headers, rows = export_service.build_rows(
+        participants=data["participants"],
+        custom_fields=custom_fields or [],
+        include_rsvp_responses=include_rsvp_responses,
+    )
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    if format == "csv":
+        body = csv_renderer.render_csv(headers, rows)
+        filename = f"gaesteliste_{event_id}_{today}.csv"
+        return Response(
+            content=body,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+
+    event_meta: dict | None = None
+    try:
+        event_meta = event_service.get_event_by_id(
+            event_id=event_id, token=credentials.credentials
+        )
+    except Exception:
+        event_meta = None
+
+    body = pdf_renderer.render_pdf(headers, rows, event_meta)
+    filename = f"gaesteliste_{event_id}_{today}.pdf"
+    return Response(
+        content=body,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
