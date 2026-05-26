@@ -72,7 +72,7 @@ class UpdateCityRequest(BaseModel):
 
 @router.get("/me/profile", status_code=status.HTTP_200_OK)
 async def get_profile(user=Depends(get_current_user), token: str = Depends(_token)):
-    """Get basic profile info including city."""
+    """Get basic profile info including city and avatar."""
     supabase_user_id = user.user.id
     email = user.user.email
     person = person_service.get_or_create_person(supabase_user_id, email, token)
@@ -80,6 +80,7 @@ async def get_profile(user=Depends(get_current_user), token: str = Depends(_toke
         "city": person.get("city") or "",
         "first_name": person.get("first_name") or "",
         "last_name": person.get("last_name") or "",
+        "avatar_url": person.get("avatar_url") or None,
     }
 
 
@@ -94,3 +95,20 @@ async def update_city(body: UpdateCityRequest, user=Depends(get_current_user), t
         "city": body.city if body.city else None,
     }).eq("person_id", person["person_id"]).execute()
     return {"city": body.city}
+
+
+class UpdateAvatarRequest(BaseModel):
+    avatar_url: str
+
+
+@router.patch("/me/avatar", status_code=status.HTTP_200_OK)
+async def update_avatar(body: UpdateAvatarRequest, user=Depends(get_current_user), token: str = Depends(_token)):
+    """Update avatar_url in the person table."""
+    supabase_user_id = user.user.id
+    email = user.user.email
+    person = person_service.get_or_create_person(supabase_user_id, email, token)
+    sb = get_supabase_for_user(token)
+    sb.table("person").update({
+        "avatar_url": body.avatar_url if body.avatar_url else None,
+    }).eq("person_id", person["person_id"]).execute()
+    return {"avatar_url": body.avatar_url}

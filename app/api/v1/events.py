@@ -46,6 +46,10 @@ def _me_token(credentials=Depends(_bearer)) -> str:
     return credentials.credentials
 
 
+def _me_token_optional(credentials=Depends(optional_bearer)) -> str | None:
+    return credentials.credentials if credentials else None
+
+
 def _to_list_item(raw: dict) -> EventListItem:
     media = raw.get("event_media") or []
     image_url = media[0]["media_url"] if media else None
@@ -130,6 +134,25 @@ async def list_public_events(
     return EventListResponse(events=events, count=total_count)
 
 
+@router.get("/host/{person_id}", response_model=EventListResponse)
+async def get_host_public_events(
+    person_id: str,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user=Depends(get_current_user_optional),
+    token: str = Depends(_me_token_optional),
+):
+    """Get all public events organized by a specific host."""
+    raw_events, total_count = event_service.get_public_events_by_host(
+        host_person_id=person_id,
+        limit=limit,
+        offset=offset,
+        token=token,
+    )
+    events = [_to_list_item(e) for e in raw_events]
+    return EventListResponse(events=events, count=total_count)
+
+
 @router.get("/me", response_model=EventListResponse)
 async def get_my_events(
     role: Optional[Literal["organizer", "attendee"]] = Query(None),
@@ -166,10 +189,12 @@ def _to_detail(raw: dict) -> EventDetailResponse:
 
     hosts = raw.get("event_host") or []
     host_name = None
+    host_person_id = None
     if hosts:
         person = hosts[0].get("person") or {}
         parts = [person.get("first_name", ""), person.get("last_name", "")]
         host_name = " ".join(p for p in parts if p).strip() or None
+        host_person_id = person.get("person_id")
 
     return EventDetailResponse(
         event_id=raw["event_id"],
@@ -192,6 +217,7 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         created_at=raw.get("created_at"),
         updated_at=raw.get("updated_at"),
         host_name=host_name,
+        host_person_id=host_person_id,
         media_urls=media_urls,
         ticket_options=[
             TicketOptionResponse(**opt)

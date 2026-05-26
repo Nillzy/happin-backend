@@ -216,6 +216,7 @@ class EventDetailResponse(EventListItem):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     host_name: str | None = None
+    host_person_id: str | None = None
     media_urls: list[str] = []
     ticket_options: list[TicketOptionResponse] = []
     custom_fields: list[CustomFieldResponse] = []
