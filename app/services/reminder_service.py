@@ -51,6 +51,10 @@ def upsert_subscription(
     user_agent: str | None,
 ) -> None:
     sb = get_supabase_for_user(token)
+    if user_agent:
+        sb.table("web_push_subscription").delete().eq("person_id", person_id).eq(
+            "user_agent", user_agent
+        ).neq("endpoint", endpoint).execute()
     sb.table("web_push_subscription").upsert(
         {
             "person_id": person_id,
