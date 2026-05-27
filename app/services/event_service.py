@@ -15,6 +15,28 @@ def _isoformat(value) -> str:
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
 
 
+def _ensure_event_active(event_id: str, token: str) -> dict:
+    """Fetch event and raise if cancelled or missing.
+
+    Raises ValueError('event_not_found') if event does not exist.
+    Raises ValueError('event_cancelled') if cancelled_at is set.
+    Returns the event row dict on success.
+    """
+    supabase = get_supabase_for_user(token)
+    row = (
+        supabase.table("event")
+        .select("event_id, cancelled_at")
+        .eq("event_id", event_id)
+        .maybe_single()
+        .execute()
+    )
+    if not row or not row.data:
+        raise ValueError("event_not_found")
+    if row.data.get("cancelled_at") is not None:
+        raise ValueError("event_cancelled")
+    return row.data
+
+
 def _strip_location_for_privacy(event_data: dict, supabase_user_id: str | None) -> dict:
     """Strip location to city/country only if location_is_private and user hasn't accepted RSVP."""
     if not event_data.get("location_is_private"):
@@ -81,7 +103,7 @@ def get_public_events(
         .eq("is_public", True)
         .eq("status", "published")
         .gte("starts_at", lower_bound)
-        .filter("deleted_at", "is", "null")
+        .filter("cancelled_at", "is", "null")
     )
     if date_to:
         count_q = count_q.lte("starts_at", date_to)
@@ -106,7 +128,7 @@ def get_public_events(
         .eq("is_public", True)
         .eq("status", "published")
         .gte("starts_at", lower_bound)
-        .filter("deleted_at", "is", "null")
+        .filter("cancelled_at", "is", "null")
     )
     if date_to:
         q = q.lte("starts_at", date_to)
@@ -182,7 +204,7 @@ def get_public_events_by_host(host_person_id: str, limit: int = 50, offset: int 
         .eq("status", "published")
         .eq("event_host.person_id", host_person_id)
         .gte("starts_at", lower_bound)
-        .filter("deleted_at", "is", "null")
+        .filter("cancelled_at", "is", "null")
     )
     count_response = count_q.execute()
     total_count = count_response.count if hasattr(count_response, "count") else 0
@@ -199,7 +221,7 @@ def get_public_events_by_host(host_person_id: str, limit: int = 50, offset: int 
         .eq("status", "published")
         .eq("event_host.person_id", host_person_id)
         .gte("starts_at", lower_bound)
-        .filter("deleted_at", "is", "null")
+        .filter("cancelled_at", "is", "null")
         .order("starts_at", desc=False)
         .range(offset, offset + limit - 1)
     )
@@ -235,7 +257,7 @@ def get_public_events_count() -> int:
         .eq("is_public", True)
         .eq("status", "published")
         .gte("starts_at", datetime.now(UTC).isoformat())
-        .filter("deleted_at", "is", "null")
+        .filter("cancelled_at", "is", "null")
         .execute()
     )
 
@@ -262,30 +284,6 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
         return None
 
     data = response.data
-
-    # Soft-delete visibility check
-    deleted_at_str = data.get("deleted_at")
-    if deleted_at_str:
-        deleted_at = datetime.fromisoformat(deleted_at_str.replace("Z", "+00:00"))
-        cutoff = deleted_at + timedelta(hours=48)
-        if datetime.now(UTC) >= cutoff:
-            return None  # 48h window expired — completely hidden
-
-        # Within 48h: only show to host or participant
-        if not supabase_user_id:
-            return None
-        hosts = data.get("event_host") or []
-        is_host_raw = any(
-            h.get("person", {}).get("supabase_user_id") == supabase_user_id
-            for h in hosts
-        )
-        participations = data.get("event_participation") or []
-        is_participant_raw = any(
-            p.get("person", {}).get("supabase_user_id") == supabase_user_id
-            for p in participations
-        )
-        if not is_host_raw and not is_participant_raw:
-            return None
 
     my_person_id = None
     if supabase_user_id:
@@ -437,6 +435,7 @@ def create_event(data: dict, person_id: str, token: str, supabase_user_id: str |
 
 def update_event(event_id: str, data: dict, person_id: str, token: str, supabase_user_id: str | None = None) -> dict | None:
     """Update an existing event. Only the host may update."""
+    _ensure_event_active(event_id, token)
     supabase = get_supabase_for_user(token)
 
     host_entry = (
@@ -591,6 +590,7 @@ def rsvp_event(event_id: str, supabase_user_id: str, email: str | None, status: 
         "[rsvp] ENTER rsvp_event event=%s status=%s user=%s",
         event_id, status, supabase_user_id,
     )
+    _ensure_event_active(event_id, token)
     supabase = get_supabase_for_user(token)
 
     person = person_service.get_or_create_person(supabase_user_id, email, token)
@@ -799,13 +799,71 @@ def remove_participants(event_id: str, participation_ids: list[str], token: str 
     return len(response.data) if response.data else 0
 
 
-def delete_event(event_id: str, person_id: str, token: str) -> None:
-    """Soft-delete an event by setting deleted_at = now().
+def _refund_all_paid_orders(event_id: str) -> "RefundSummary":
+    """Refund every paid ticket_order for the event, mark pending orders as failed.
+
+    Skips orders where every associated ticket has been scanned already.
+    Stripe failures are logged but do not abort — they appear in failed_order_ids.
+    """
+    from app.schemas.events import RefundSummary
+    from app.services import payment_service
+
+    supabase = get_supabase()
+
+    paid_orders = (
+        supabase.table("ticket_order")
+        .select("ticket_order_id, event_id, person_id, amount_total_cents, stripe_payment_intent_id, ticket_option_id")
+        .eq("event_id", event_id)
+        .eq("status", "paid")
+        .execute()
+    )
+
+    refunded_count = 0
+    failed_count = 0
+    failed_order_ids: list[str] = []
+    skipped_count = 0
+
+    for order in paid_orders.data or []:
+        order_tickets = (
+            supabase.table("ticket")
+            .select("ticket_id, scanned_at")
+            .eq("ticket_order_id", order["ticket_order_id"])
+            .execute()
+        )
+        tickets = order_tickets.data or []
+        if tickets and all(t.get("scanned_at") for t in tickets):
+            skipped_count += 1
+            continue
+
+        result = payment_service._refund_single_order(
+            order,
+            idempotency_key=f"event-cancel-{order['ticket_order_id']}",
+        )
+        if result["refunded"]:
+            refunded_count += 1
+        else:
+            failed_count += 1
+            failed_order_ids.append(order["ticket_order_id"])
+
+    supabase.table("ticket_order").update({"status": "failed"}).eq(
+        "event_id", event_id
+    ).eq("status", "pending").execute()
+
+    return RefundSummary(
+        refunded_count=refunded_count,
+        failed_count=failed_count,
+        failed_order_ids=failed_order_ids,
+        skipped_count=skipped_count,
+    )
+
+
+def cancel_event(event_id: str, person_id: str, token: str) -> "RefundSummary":
+    """Cancel an event by setting cancelled_at = now() and refunding paid tickets.
 
     Raises PermissionError if caller is not the host.
     Raises ValueError('event_not_found') if event does not exist.
-    Raises ValueError('already_deleted') if event is already deleted.
-    Raises ValueError('too_close_to_start') if starts_at - now() < 48h.
+    Raises ValueError('already_cancelled') if event is already cancelled.
+    Returns RefundSummary with refund counts.
     """
     supabase = get_supabase_for_user(token)
 
@@ -822,7 +880,7 @@ def delete_event(event_id: str, person_id: str, token: str) -> None:
 
     event_row = (
         supabase.table("event")
-        .select("starts_at, deleted_at")
+        .select("cancelled_at")
         .eq("event_id", event_id)
         .maybe_single()
         .execute()
@@ -830,21 +888,17 @@ def delete_event(event_id: str, person_id: str, token: str) -> None:
     if not event_row.data:
         raise ValueError("event_not_found")
 
-    if event_row.data.get("deleted_at") is not None:
-        raise ValueError("already_deleted")
-
-    starts_at_str = event_row.data["starts_at"]
-    starts_at = datetime.fromisoformat(starts_at_str.replace("Z", "+00:00"))
-    if starts_at - datetime.now(UTC) < timedelta(hours=48):
-        raise ValueError("too_close_to_start")
+    if event_row.data.get("cancelled_at") is not None:
+        raise ValueError("already_cancelled")
 
     supabase.table("event").update(
-        {"deleted_at": datetime.now(UTC).isoformat()}
+        {"cancelled_at": datetime.now(UTC).isoformat()}
     ).eq("event_id", event_id).execute()
 
     try:
         from app.services import notification_service
         notification_service.fanout_event_cancelled(event_id)
     except Exception:
-        import logging
-        logging.getLogger(__name__).exception("[notifications] fanout_event_cancelled fehlgeschlagen")
+        logger.exception("[notifications] fanout_event_cancelled fehlgeschlagen")
+
+    return _refund_all_paid_orders(event_id)

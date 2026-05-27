@@ -184,6 +184,7 @@ async def create_checkout_session(
             "ticket_option_required": (400, "A ticket option is required for checkout"),
             "event_full": (409, "Event is fully booked"),
             "event_not_found": (404, "Event not found"),
+            "event_cancelled": (400, "Event wurde abgesagt und kann nicht mehr verändert werden"),
             "ticket_option_sold_out": (409, "Ticket option sold out"),
             "max_tickets_exceeded": (409, "Maximum tickets per person exceeded"),
             "checkout_processing": (409, "Payment is being processed for this event"),

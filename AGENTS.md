@@ -165,15 +165,17 @@ The production server listens on `http://vm552.ipp-vps.net:8001`.
 If you make commits, they should always be in german.
 Never push to the main branch. If you start a new topic open a new one.
 
-## Event Soft-Delete
+## Event Absagen
 
-Events können von Hosts soft-gelöscht werden.
+Events können von Hosts abgesagt werden. Beim Absagen werden alle bezahlten Tickets automatisch via Stripe zurückerstattet.
 
-- **Endpoint**: `DELETE /api/v1/events/{event_id}` — nur Host, nur wenn `starts_at - now() >= 48h`, Response: 204
-- **Feld**: `event.deleted_at TIMESTAMPTZ NULL` — NULL = aktiv
-- **Service**: `event_service.delete_event()` — setzt `deleted_at`
-- **Sichtbarkeit**: Gelöschte Events für 48h für Host/Teilnehmer sichtbar (`is_deleted=true`), danach ausgeblendet
-- **API-Response**: `is_deleted: bool` und `deleted_at: datetime | None` in allen Event-Endpoints
-- **Tests**: `backend/tests/test_events_delete.py`
-- **Docs**: `backend/documentation/20-event-soft-delete.md`
+- **Endpoint**: `POST /api/v1/events/{event_id}/cancel` — nur Host, jederzeit möglich (keine 48h-Sperre), Response: 200 mit `RefundSummary`
+- **Feld**: `event.cancelled_at TIMESTAMPTZ NULL` — NULL = aktiv
+- **Service**: `event_service.cancel_event()` — setzt `cancelled_at`, ruft Auto-Refund auf
+- **Sichtbarkeit**: Abgesagte Events bleiben dauerhaft für Host/Teilnehmer sichtbar (`is_cancelled=true`); Discovery-Feed filtert sie aus
+- **Auto-Refund**: `_refund_all_paid_orders` mit Idempotency-Key `event-cancel-{order_id}`; Stripe-Fehler blockieren Cancel nicht
+- **Aktions-Sperren**: `_ensure_event_active` Helper sperrt RSVP, PATCH, Checkout und Custom-Field-Updates auf abgesagten Events (Error: `event_cancelled` → 400)
+- **API-Response**: `is_cancelled: bool` und `cancelled_at: datetime | None` in allen Event-Endpoints
+- **Tests**: `backend/tests/test_events_cancel.py`, `backend/tests/test_events_cancelled_locks.py`
+- **Docs**: `backend/documentation/20-event-absagen.md`
 

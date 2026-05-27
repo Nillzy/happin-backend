@@ -510,49 +510,35 @@ def fail_ticket_order(order_id: str) -> None:
     ).eq("status", "pending").execute()
 
 
-def cancel_ticket_order(event_id: str, person_id: str) -> dict:
-    """Cancel the latest paid ticket order: Stripe refund first, then DB updates."""
+def _refund_single_order(order: dict, idempotency_key: str | None = None) -> dict:
+    """Refund a single paid ticket_order via Stripe and update DB state.
+
+    Returns a result dict: {"refunded": bool, "amount_cents": int, "order_id": str, "error": str | None}.
+    On success: order.status = 'refunded', tickets deleted, participation set to 'Declined' if no tickets remain.
+    On failure: order is left untouched and the error reason is returned in 'error'.
+    """
     supabase = get_supabase()
-
-    paid_rows = (
-        supabase.table("ticket_order")
-        .select("*")
-        .eq("event_id", event_id)
-        .eq("person_id", person_id)
-        .eq("status", "paid")
-        .order("paid_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    order = (paid_rows.data or [None])[0]
-    if not order:
-        refunded_rows = (
-            supabase.table("ticket_order")
-            .select("amount_total_cents")
-            .eq("event_id", event_id)
-            .eq("person_id", person_id)
-            .eq("status", "refunded")
-            .order("paid_at", desc=True)
-            .limit(1)
-            .execute()
-        )
-        prev = (refunded_rows.data or [None])[0]
-        if prev:
-            return {"refunded": True, "amount_cents": prev["amount_total_cents"]}
-        raise ValueError("no_paid_order")
-
     order_id = order["ticket_order_id"]
+
     payment_intent_id = _resolve_payment_intent_id(order)
     if not payment_intent_id:
-        raise ValueError("refund_not_possible")
+        return {"refunded": False, "amount_cents": 0, "order_id": order_id, "error": "refund_not_possible"}
 
-    refund = stripe_payment.create_refund(
-        payment_intent_id,
-        idempotency_key=f"refund-{order_id}",
-    )
+    event_id = order["event_id"]
+    person_id = order["person_id"]
+
+    try:
+        refund = stripe_payment.create_refund(
+            payment_intent_id,
+            idempotency_key=idempotency_key or f"refund-{order_id}",
+        )
+    except Exception:  # pragma: no cover — Stripe SDK exceptions
+        logger.exception("Stripe refund failed for order %s", order_id)
+        return {"refunded": False, "amount_cents": 0, "order_id": order_id, "error": "refund_failed"}
+
     refund_status = getattr(refund, "status", None) or refund.get("status")
     if refund_status not in ("succeeded", "pending"):
-        raise ValueError("refund_failed")
+        return {"refunded": False, "amount_cents": 0, "order_id": order_id, "error": "refund_failed"}
 
     supabase.table("ticket_order").update({
         "status": "refunded",
@@ -584,6 +570,47 @@ def cancel_ticket_order(event_id: str, person_id: str) -> dict:
                 "event_participation_id", ep_data["event_participation_id"]
             ).execute()
 
+    return {"refunded": True, "amount_cents": order["amount_total_cents"], "order_id": order_id, "error": None}
+
+
+def cancel_ticket_order(event_id: str, person_id: str) -> dict:
+    """Cancel the latest paid ticket order: Stripe refund first, then DB updates."""
+    supabase = get_supabase()
+
+    paid_rows = (
+        supabase.table("ticket_order")
+        .select("*")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .eq("status", "paid")
+        .order("paid_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    order = (paid_rows.data or [None])[0]
+    if not order:
+        refunded_rows = (
+            supabase.table("ticket_order")
+            .select("amount_total_cents")
+            .eq("event_id", event_id)
+            .eq("person_id", person_id)
+            .eq("status", "refunded")
+            .order("paid_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        prev = (refunded_rows.data or [None])[0]
+        if prev:
+            return {"refunded": True, "amount_cents": prev["amount_total_cents"]}
+        raise ValueError("no_paid_order")
+
+    result = _refund_single_order(order)
+    if not result["refunded"]:
+        # Surface the original error code (refund_not_possible / refund_failed)
+        raise ValueError(result["error"])
+
+    order_id = order["ticket_order_id"]
+
     if order.get("ticket_option_id"):
         limit_row = (
             supabase.table("ticket_option")
@@ -601,7 +628,7 @@ def cancel_ticket_order(event_id: str, person_id: str) -> dict:
     logger.info("Cancelled order %s", order_id)
     return {
         "refunded": True,
-        "amount_cents": order["amount_total_cents"],
+        "amount_cents": result["amount_cents"],
     }
 
 

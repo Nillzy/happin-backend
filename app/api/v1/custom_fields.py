@@ -59,6 +59,12 @@ async def sync_custom_fields(
         return [CustomFieldResponse(**row) for row in result]
     except HTTPException:
         raise
+    except ValueError as e:
+        if str(e) == "event_cancelled":
+            raise HTTPException(status_code=400, detail="Event wurde abgesagt und kann nicht mehr verändert werden")
+        if str(e) == "event_not_found":
+            raise HTTPException(status_code=404, detail="Event nicht gefunden")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Custom fields sync error")
         raise HTTPException(status_code=500, detail=str(e))
@@ -83,7 +89,9 @@ async def submit_responses(
         person_id = person["person_id"]
 
         from app.core.supabase import get_supabase_for_user
+        from app.services.event_service import _ensure_event_active
 
+        _ensure_event_active(event_id, credentials.credentials)
         supabase = get_supabase_for_user(credentials.credentials)
         ticket = (
             supabase.table("ticket")
@@ -106,6 +114,12 @@ async def submit_responses(
         return [CustomFieldResponseItem(**row) for row in result]
     except HTTPException:
         raise
+    except ValueError as e:
+        if str(e) == "event_cancelled":
+            raise HTTPException(status_code=400, detail="Event wurde abgesagt und kann nicht mehr verändert werden")
+        if str(e) == "event_not_found":
+            raise HTTPException(status_code=404, detail="Event nicht gefunden")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Submit responses error")
         raise HTTPException(status_code=500, detail=str(e))

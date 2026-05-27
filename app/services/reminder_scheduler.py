@@ -124,7 +124,7 @@ def _dispatch_due_reminders() -> None:
                 db.table("event")
                 .select("event_id, title, starts_at")
                 .in_("event_id", event_ids)
-                .is_("deleted_at", "null")
+                .is_("cancelled_at", "null")
                 .gt("starts_at", now.isoformat())
                 .lte("starts_at", latest_starts_at.isoformat())
                 .execute()
