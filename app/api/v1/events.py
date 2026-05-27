@@ -33,6 +33,7 @@ from app.services import ticket_service
 from app.services import calendar_service
 from app.services import google_wallet_service
 from app.services import custom_field_service
+from app.services import weather_service
 from app.services.export import export_service, csv_renderer, pdf_renderer
 
 router = APIRouter()
@@ -196,6 +197,16 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         host_name = " ".join(p for p in parts if p).strip() or None
         host_person_id = person.get("person_id")
 
+    # Fetch weather forecast if enabled
+    weather_forecast = None
+    if raw.get("show_weather_forecast"):
+        loc = raw.get("location") or {}
+        lat = loc.get("latitude")
+        lon = loc.get("longitude")
+        starts_at = raw.get("starts_at")
+        if lat and lon and starts_at:
+            weather_forecast = weather_service.get_event_weather(lat, lon, starts_at)
+
     return EventDetailResponse(
         event_id=raw["event_id"],
         title=raw["title"],
@@ -234,6 +245,8 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         location_is_private=raw.get("location_is_private", False),
         accent_color_primary=raw.get("accent_color_primary"),
         accent_color_secondary=raw.get("accent_color_secondary"),
+        show_weather_forecast=raw.get("show_weather_forecast", False),
+        weather_forecast=weather_forecast,
     )
 
 

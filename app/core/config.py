@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # MapTiler Geocoding
     MAPTILER_KEY: str | None = None
 
+    # WeatherAPI.com
+    WEATHERAPI_KEY: str | None = None
+
     # Unsplash API
     UNSPLASH_ACCESS_KEY: str | None = None
 
