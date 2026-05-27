@@ -127,6 +127,109 @@ def require_stripe_for_paid_public_tickets(
     _assert_host_stripe_ready(get_host_stripe_account(event_id))
 
 
+def _append_query_param(url: str, key: str, value: str) -> str:
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}{key}={value}"
+
+
+def _expire_pending_order(order_id: str, event_id: str) -> None:
+    expire_ticket_order(order_id)
+    try:
+        from app.services.waitlist_service import promote_next
+
+        promote_next(event_id)
+    except Exception:
+        logger.exception("promote_next failed after checkout expired for event %s", event_id)
+
+
+def sync_pending_checkout_with_stripe(supabase, order: dict) -> str | None:
+    """
+    Reconcile a pending order with Stripe session state.
+    Returns Stripe session status, or None when there is no linked session.
+    Expires local orders whose Stripe session is no longer open.
+    """
+    session_id = order.get("stripe_checkout_session_id")
+    if not session_id:
+        return None
+
+    try:
+        session = stripe_payment.retrieve_checkout_session(session_id)
+    except Exception:
+        logger.exception("Failed to retrieve checkout session %s", session_id)
+        return None
+
+    status = stripe_payment.checkout_session_status(session)
+    payment_status = stripe_payment.checkout_session_payment_status(session)
+    order_id = order["ticket_order_id"]
+    event_id = order["event_id"]
+
+    if status == "expired":
+        _expire_pending_order(order_id, event_id)
+        return status
+
+    if status == "complete" and payment_status in ("unpaid", "failed"):
+        fail_ticket_order(order_id)
+        try:
+            from app.services.waitlist_service import promote_next
+
+            promote_next(event_id)
+        except Exception:
+            logger.exception("promote_next failed after payment failed for event %s", event_id)
+        return status
+
+    return status
+
+
+def sync_pending_checkouts(supabase, event_id: str, person_id: str) -> None:
+    """Sync all pending checkout orders for a user/event with Stripe."""
+    rows = (
+        supabase.table("ticket_order")
+        .select("*")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .eq("status", "pending")
+        .execute()
+    )
+    for order in rows.data or []:
+        sync_pending_checkout_with_stripe(supabase, order)
+
+
+def abandon_checkout(*, event_id: str, person_id: str) -> bool:
+    """Invalidate open checkouts for an event (Stripe session + local orders)."""
+    supabase = get_supabase()
+    rows = (
+        supabase.table("ticket_order")
+        .select("*")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .eq("status", "pending")
+        .execute()
+    )
+    orders = rows.data or []
+    if not orders:
+        return False
+
+    abandoned = False
+    for order in orders:
+        session_id = order.get("stripe_checkout_session_id")
+        if session_id:
+            try:
+                session = stripe_payment.retrieve_checkout_session(session_id)
+                status = stripe_payment.checkout_session_status(session)
+                payment_status = stripe_payment.checkout_session_payment_status(session)
+                if status == "complete" and payment_status == "paid":
+                    continue
+                if status == "open":
+                    stripe_payment.expire_checkout_session(session_id)
+            except Exception:
+                logger.exception("Failed to expire Stripe checkout session %s", session_id)
+
+        _expire_pending_order(order["ticket_order_id"], event_id)
+        abandoned = True
+
+    return abandoned
+
+
 def create_checkout_session(
     *,
     event_id: str,
@@ -138,7 +241,9 @@ def create_checkout_session(
     """Create a Stripe Checkout Session and a pending ticket_order."""
     supabase = get_supabase()
 
-    booking_service.clear_pending_checkouts(supabase, event_id, person_id)
+    booking_service.expire_stale_pending_orders(supabase, event_id, person_id)
+    sync_pending_checkouts(supabase, event_id, person_id)
+    abandon_checkout(event_id=event_id, person_id=person_id)
 
     opt_data = booking_service.validate_booking(
         supabase,
@@ -190,6 +295,7 @@ def create_checkout_session(
     success_url += f"{separator}event_id={event_id}"
 
     cancel_url = settings.STRIPE_CHECKOUT_CANCEL_URL or success_url
+    cancel_url = _append_query_param(cancel_url, "event_id", event_id)
 
     event_title = event_row.data.get("title", "Event")
     product_name = f"{event_title} – {opt_data['name']}"

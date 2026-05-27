@@ -124,6 +124,32 @@ def retrieve_checkout_session(session_id: str) -> Any:
     return client.v1.checkout.sessions.retrieve(session_id)
 
 
+def expire_checkout_session(session_id: str) -> Any:
+    """Expire an open Checkout Session so it can no longer be completed."""
+    client = get_stripe_client()
+    return client.v1.checkout.sessions.expire(session_id)
+
+
+def checkout_session_status(session: Any) -> str:
+    if isinstance(session, dict):
+        return str(session.get("status") or "")
+    return str(getattr(session, "status", "") or "")
+
+
+def checkout_session_url(session: Any) -> str | None:
+    if isinstance(session, dict):
+        url = session.get("url")
+        return str(url) if url else None
+    url = getattr(session, "url", None)
+    return str(url) if url else None
+
+
+def checkout_session_payment_status(session: Any) -> str:
+    if isinstance(session, dict):
+        return str(session.get("payment_status") or "")
+    return str(getattr(session, "payment_status", "") or "")
+
+
 def retrieve_balance(account_id: str) -> Any:
     """Retrieve the balance of a connected account."""
     client = get_stripe_client()

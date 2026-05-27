@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class CreateCheckoutSessionRequest(BaseModel):
     ticket_option_id: str
-    quantity: int = Field(ge=1, le=10, default=1)
+    quantity: int = Field(ge=1, le=99, default=1)
 
 
 class CreateCheckoutSessionResponse(BaseModel):
