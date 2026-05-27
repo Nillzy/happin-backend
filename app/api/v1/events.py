@@ -26,6 +26,7 @@ from app.schemas.participants import (
     RemoveParticipantsRequest,
     RemoveParticipantsResponse,
 )
+from app.schemas.waitlist import WaitlistJoinResponse, WaitlistPositionResponse
 from app.services import event_service
 from app.services import person_service
 from app.services import user_service
@@ -35,6 +36,7 @@ from app.services import google_wallet_service
 from app.services import custom_field_service
 from app.services import weather_service
 from app.services.export import export_service, csv_renderer, pdf_renderer
+from app.services import waitlist_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -247,6 +249,9 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         accent_color_secondary=raw.get("accent_color_secondary"),
         show_weather_forecast=raw.get("show_weather_forecast", False),
         weather_forecast=weather_forecast,
+        waitlist_promotion_hours=raw.get("waitlist_promotion_hours", 24),
+        is_full=raw.get("is_full", False),
+        my_waitlist_position=raw.get("my_waitlist_position"),
     )
 
 
@@ -345,6 +350,7 @@ async def rsvp_to_event(
     user=Depends(get_current_user),
     credentials=Depends(HTTPBearer()),
 ):
+    declined = False
     try:
         raw = event_service.rsvp_event(
             event_id=event_id,
@@ -377,6 +383,7 @@ async def rsvp_to_event(
                 person_id=person_id,
                 token=credentials.credentials,
             )
+            declined = True
         elif body.status == "Accepted":
             max_per_person = booking_service.get_max_tickets_per_person(supabase, event_id)
             ticket_count = min(body.ticket_count, max_per_person)
@@ -408,6 +415,13 @@ async def rsvp_to_event(
     except Exception as e:
         logger.exception("RSVP error")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Decline succeeded — fire promotion separately so errors don't fail the RSVP response
+        if declined:
+            try:
+                waitlist_service.promote_next(event_id)
+            except Exception:
+                logger.exception("promote_next failed after RSVP decline for event %s", event_id)
 
 
 @router.get("/{event_id}/participants", response_model=ParticipantListResponse)
@@ -502,8 +516,96 @@ async def delete_participants(
         participation_ids=request.participation_ids,
         token=credentials.credentials,
     )
+    try:
+        waitlist_service.promote_next(event_id)
+    except Exception:
+        logger.exception("promote_next failed after participant removal for event %s", event_id)
 
     return RemoveParticipantsResponse(removed_count=removed_count)
+
+
+_WAITLIST_ERRORS = {
+    "event_not_found":            (404, "Event not found"),
+    "event_no_capacity_limit":    (400, "This event has no capacity limit — waitlist is not available"),
+    "host_cannot_join_waitlist":  (403, "Hosts cannot join the waitlist"),
+    "already_participant":        (409, "You are already a participant of this event"),
+    "already_on_waitlist":        (409, "You are already on the waitlist for this event"),
+    "event_not_full":             (400, "The event is not fully booked yet — you can register directly"),
+    "not_on_waitlist":            (404, "You are not on the waitlist for this event"),
+}
+
+
+@router.post("/{event_id}/waitlist", response_model=WaitlistJoinResponse, status_code=201)
+async def join_waitlist(
+    event_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Join the waitlist for a fully-booked event."""
+    try:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        result = waitlist_service.join_waitlist(
+            event_id=event_id,
+            person_id=person["person_id"],
+            token=credentials.credentials,
+        )
+        return WaitlistJoinResponse(**result)
+    except ValueError as e:
+        code, detail = _WAITLIST_ERRORS.get(str(e), (400, str(e)))
+        raise HTTPException(status_code=code, detail=detail)
+
+
+@router.delete("/{event_id}/waitlist", status_code=204)
+async def leave_waitlist(
+    event_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Remove yourself from the event waitlist."""
+    try:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        waitlist_service.leave_waitlist(
+            event_id=event_id,
+            person_id=person["person_id"],
+            token=credentials.credentials,
+        )
+        # Always call promote_next: if the user was in 'notified' state they freed a soft-reserved slot
+        waitlist_service.promote_next(event_id)
+    except ValueError as e:
+        code, detail = _WAITLIST_ERRORS.get(str(e), (400, str(e)))
+        raise HTTPException(status_code=code, detail=detail)
+
+
+@router.get("/{event_id}/waitlist/position", response_model=WaitlistPositionResponse)
+async def get_waitlist_position(
+    event_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Get the current user's position in the event waitlist."""
+    try:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=credentials.credentials,
+        )
+        position = waitlist_service.get_waitlist_position(
+            event_id=event_id,
+            person_id=person["person_id"],
+            token=credentials.credentials,
+        )
+        return WaitlistPositionResponse(position=position)
+    except ValueError as e:
+        code, detail = _WAITLIST_ERRORS.get(str(e), (400, str(e)))
+        raise HTTPException(status_code=code, detail=detail)
 
 
 _DELETE_EVENT_ERRORS = {

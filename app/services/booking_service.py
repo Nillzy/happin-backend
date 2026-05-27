@@ -211,7 +211,15 @@ def validate_booking(
     if max_cap is not None:
         current = count_event_tickets(supabase, event_id)
         pending = count_pending_order_quantity(supabase, event_id)
-        if current + pending + quantity > int(max_cap):
+        notified_resp = (
+            supabase.table("event_waitlist")
+            .select("waitlist_id", count="exact")
+            .eq("event_id", event_id)
+            .eq("status", "notified")
+            .execute()
+        )
+        notified = notified_resp.count or 0
+        if current + pending + notified + quantity > int(max_cap):
             raise ValueError("event_full")
 
     max_per_person = get_max_tickets_per_person(supabase, event_id)

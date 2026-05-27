@@ -127,6 +127,7 @@ class EventUpdate(BaseModel):
     accent_color_primary: str | None = None
     accent_color_secondary: str | None = None
     show_weather_forecast: bool | None = None
+    waitlist_promotion_hours: int | None = None
 
     @field_validator("title")
     @classmethod
@@ -226,6 +227,9 @@ class EventDetailResponse(EventListItem):
     ticket: list[dict] = []
     show_weather_forecast: bool = False
     weather_forecast: dict | None = None
+    is_full: bool = False
+    my_waitlist_position: int | None = None
+    waitlist_promotion_hours: int = 24
 
 
 class RsvpRequest(BaseModel):

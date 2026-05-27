@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     STRIPE_CONNECT_REFRESH_URL: str = "https://happin.fun/connect/refresh"
     STRIPE_CONNECT_RETURN_URL: str = "https://happin.fun/connect/return"
 
+    # Resend Email
+    RESEND_API_KEY: str | None = None
+    RESEND_FROM_EMAIL: str = "Happin <noreply@happin.fun>"
+
     # Google Wallet
     GOOGLE_WALLET_ISSUER_ID: str | None = None
     GOOGLE_SERVICE_ACCOUNT_FILE: str | None = None

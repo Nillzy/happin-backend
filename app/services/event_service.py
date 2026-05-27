@@ -1,11 +1,14 @@
 """Event-related business logic and Supabase queries."""
 
+import logging
 import secrets
 from datetime import datetime, timezone, UTC, timedelta
 
 from app.core.supabase import get_supabase, get_supabase_for_user, get_supabase_admin
 from app.services import person_service
 from app.services.geocoding_service import geocode_address
+
+logger = logging.getLogger(__name__)
 
 
 def _isoformat(value) -> str:
@@ -284,6 +287,7 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
         if not is_host_raw and not is_participant_raw:
             return None
 
+    my_person_id = None
     if supabase_user_id:
         participations = data.get("event_participation") or []
         my_participation = next(
@@ -299,7 +303,6 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
             for h in hosts
         )
 
-        my_person_id = None
         person_row = (
             supabase.table("person")
             .select("person_id")
@@ -327,6 +330,35 @@ def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: s
         data["is_free"] = False
 
     _strip_location_for_privacy(data, supabase_user_id)
+
+    # Compute is_full: checks tickets + pending orders + notified waitlist entries vs max_capacity
+    max_cap = data.get("max_capacity")
+    if max_cap:
+        try:
+            from app.services.waitlist_service import (
+                expire_stale_promotions,
+                _count_notified,
+                get_waitlist_position_for_person,
+            )
+            from app.core.supabase import get_supabase_admin
+            from app.services import booking_service as _bs
+            expire_stale_promotions(event_id)
+            _admin = get_supabase_admin()
+            t_count = int(_bs.count_event_tickets(_admin, event_id) or 0)
+            p_count = int(_bs.count_pending_order_quantity(_admin, event_id) or 0)
+            n_count = int(_count_notified(_admin, event_id) or 0)
+            data["is_full"] = (t_count + p_count + n_count) >= int(max_cap)
+            data["my_waitlist_position"] = (
+                get_waitlist_position_for_person(event_id, my_person_id, _admin)
+                if my_person_id else None
+            )
+        except Exception:
+            logger.exception("Failed to compute waitlist fields for event %s", event_id)
+            data["is_full"] = False
+            data["my_waitlist_position"] = None
+    else:
+        data["is_full"] = False
+        data["my_waitlist_position"] = None
 
     return data
 
