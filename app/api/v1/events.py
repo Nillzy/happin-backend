@@ -7,7 +7,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.core.auth import get_current_user, get_current_user_optional
+from app.core.auth import get_current_user
 from app.schemas.events import (
     EventCreate, EventUpdate, EventListItem, EventListResponse,
     EventDetailResponse, RsvpRequest, RsvpResponse, RefundSummary,
@@ -41,16 +41,11 @@ from app.services import waitlist_service
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-optional_bearer = HTTPBearer(auto_error=False)
 _bearer = HTTPBearer()
 
 
 def _me_token(credentials=Depends(_bearer)) -> str:
     return credentials.credentials
-
-
-def _me_token_optional(credentials=Depends(optional_bearer)) -> str | None:
-    return credentials.credentials if credentials else None
 
 
 def _to_list_item(raw: dict) -> EventListItem:
@@ -142,8 +137,8 @@ async def get_host_public_events(
     person_id: str,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    user=Depends(get_current_user_optional),
-    token: str = Depends(_me_token_optional),
+    user=Depends(get_current_user),
+    token: str = Depends(_me_token),
 ):
     """Get all public events organized by a specific host."""
     raw_events, total_count = event_service.get_public_events_by_host(
@@ -258,11 +253,11 @@ def _to_detail(raw: dict) -> EventDetailResponse:
 @router.get("/{event_id}", response_model=EventDetailResponse)
 async def get_event_detail(
     event_id: str,
-    user=Depends(get_current_user_optional),
-    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
+    user=Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
 ):
-    supabase_user_id = user.user.id if user else None
-    token = credentials.credentials if credentials else None
+    supabase_user_id = user.user.id
+    token = credentials.credentials
     raw = event_service.get_event_by_id(event_id, supabase_user_id, token)
     if not raw:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -688,7 +683,7 @@ async def scan_ticket(
 @router.get("/{event_id}/calendar.ics")
 async def get_event_calendar(
     event_id: str,
-    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
 ):
     """
     Generate an ICS calendar file for an event.
@@ -696,7 +691,7 @@ async def get_event_calendar(
     Returns a downloadable .ics file that can be imported into
     Apple Calendar, Google Calendar, Outlook, etc.
     """
-    token = credentials.credentials if credentials else None
+    token = credentials.credentials
     ics_content = calendar_service.generate_ics(event_id, token)
 
     if not ics_content:

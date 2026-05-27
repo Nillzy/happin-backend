@@ -32,11 +32,14 @@ def _mock_calendar_chain(mock_supabase, data):
     maybe_single_mock.execute.return_value = response
 
 
-def test_calendar_endpoint_returns_ics(client, mock_supabase):
+def test_calendar_endpoint_returns_ics(client, auth_headers, mock_supabase):
     """Test that the calendar endpoint returns a valid ICS file."""
     _mock_calendar_chain(mock_supabase, MOCK_EVENT_FOR_CALENDAR)
 
-    response = client.get("/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics")
+    response = client.get(
+        "/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics",
+        headers=auth_headers,
+    )
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/calendar; charset=utf-8"
@@ -51,11 +54,14 @@ def test_calendar_endpoint_returns_ics(client, mock_supabase):
     assert "Techno Night Berlin" in content
 
 
-def test_calendar_contains_event_details(client, mock_supabase):
+def test_calendar_contains_event_details(client, auth_headers, mock_supabase):
     """Test that ICS contains all event details."""
     _mock_calendar_chain(mock_supabase, MOCK_EVENT_FOR_CALENDAR)
 
-    response = client.get("/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics")
+    response = client.get(
+        "/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics",
+        headers=auth_headers,
+    )
     content = response.content.decode("utf-8")
 
     assert "SUMMARY:Techno Night Berlin" in content
@@ -67,33 +73,42 @@ def test_calendar_contains_event_details(client, mock_supabase):
     assert "Berlin" in content
 
 
-def test_calendar_endpoint_not_found(client, mock_supabase):
+def test_calendar_endpoint_not_found(client, auth_headers, mock_supabase):
     """Test that 404 is returned for non-existent events."""
     _mock_calendar_chain(mock_supabase, None)
 
-    response = client.get("/api/v1/events/00000000-0000-0000-0000-000000000000/calendar.ics")
+    response = client.get(
+        "/api/v1/events/00000000-0000-0000-0000-000000000000/calendar.ics",
+        headers=auth_headers,
+    )
 
     assert response.status_code == 404
 
 
-def test_calendar_event_without_end_time(client, mock_supabase):
+def test_calendar_event_without_end_time(client, auth_headers, mock_supabase):
     """Test that events without end_at get a default 2-hour duration."""
     event_no_end = {**MOCK_EVENT_FOR_CALENDAR, "ends_at": None}
     _mock_calendar_chain(mock_supabase, event_no_end)
 
-    response = client.get("/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics")
+    response = client.get(
+        "/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics",
+        headers=auth_headers,
+    )
 
     assert response.status_code == 200
     content = response.content.decode("utf-8")
     assert "DTEND" in content
 
 
-def test_calendar_event_without_location(client, mock_supabase):
+def test_calendar_event_without_location(client, auth_headers, mock_supabase):
     """Test that events without location still generate valid ICS."""
     event_no_location = {**MOCK_EVENT_FOR_CALENDAR, "location": None}
     _mock_calendar_chain(mock_supabase, event_no_location)
 
-    response = client.get("/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics")
+    response = client.get(
+        "/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics",
+        headers=auth_headers,
+    )
 
     assert response.status_code == 200
     content = response.content.decode("utf-8")
@@ -101,11 +116,14 @@ def test_calendar_event_without_location(client, mock_supabase):
     assert "BEGIN:VEVENT" in content
 
 
-def test_calendar_uid_format(client, mock_supabase):
+def test_calendar_uid_format(client, auth_headers, mock_supabase):
     """Test that the UID follows the expected format."""
     _mock_calendar_chain(mock_supabase, MOCK_EVENT_FOR_CALENDAR)
 
-    response = client.get("/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics")
+    response = client.get(
+        "/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322/calendar.ics",
+        headers=auth_headers,
+    )
     content = response.content.decode("utf-8")
 
     assert "UID:35b43254-4e21-459f-b729-4cb3966cf322@happin.app" in content

@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from app.core.auth import get_current_user, get_current_user_optional
+from app.core.auth import get_current_user
 from app.schemas.custom_fields import (
     CustomFieldSyncRequest,
     CustomFieldResponse,
@@ -27,7 +27,7 @@ def _verify_host(event_id: str, person_id: str) -> None:
 @router.get("/{event_id}/custom-fields", response_model=list[CustomFieldResponse])
 async def get_custom_fields(
     event_id: str,
-    user=Depends(get_current_user_optional),
+    user=Depends(get_current_user),
 ):
     try:
         result = custom_field_service.get_custom_fields(event_id)
