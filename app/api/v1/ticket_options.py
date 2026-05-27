@@ -13,6 +13,12 @@ from app.services import ticket_option_service, person_service
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+_STRIPE_SETUP_ERRORS = {
+    "host_not_onboarded": (402, "Host has not completed payment setup"),
+    "host_charges_not_enabled": (402, "Host payment account is not yet active"),
+    "event_not_found": (404, "Event not found"),
+}
+
 
 def _verify_host(event_id: str, person_id: str, token: str) -> None:
     """Raise 403 if the person is not the host of the event."""
@@ -54,6 +60,9 @@ async def sync_ticket_options(
         return [TicketOptionResponse(**row) for row in result]
     except HTTPException:
         raise
+    except ValueError as e:
+        code, detail = _STRIPE_SETUP_ERRORS.get(str(e), (400, str(e)))
+        raise HTTPException(status_code=code, detail=detail)
     except Exception as e:
         logger.exception("Ticket options sync error")
         raise HTTPException(status_code=500, detail=str(e))

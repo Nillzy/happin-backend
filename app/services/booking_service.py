@@ -79,7 +79,7 @@ def count_user_pending_order_quantity(
     return sum(r["quantity"] for r in (rows.data or []))
 
 
-def get_max_tickets_per_person(supabase: SupabaseClient, event_id: str) -> int:
+def get_max_tickets_per_person(supabase: SupabaseClient, event_id: str) -> int | None:
     row = (
         supabase.table("event")
         .select("max_tickets_per_person, max_capacity")
@@ -87,7 +87,10 @@ def get_max_tickets_per_person(supabase: SupabaseClient, event_id: str) -> int:
         .single()
         .execute()
     )
-    return int((row.data or {}).get("max_tickets_per_person") or 1)
+    value = (row.data or {}).get("max_tickets_per_person")
+    if value is None:
+        return None
+    return int(value)
 
 
 def user_has_paid_purchase(
@@ -147,6 +150,21 @@ def expire_stale_pending_orders(
             supabase.table("ticket_order").update({"status": "expired"}).eq(
                 "ticket_order_id", row["ticket_order_id"]
             ).eq("status", "pending").execute()
+
+
+def clear_pending_checkouts(
+    supabase: SupabaseClient, event_id: str, person_id: str
+) -> None:
+    """
+    Expire abandoned pending checkouts only.
+    Keeps orders linked to an active Stripe Checkout session intact so webhooks can fulfill them.
+    """
+    expire_stale_pending_orders(supabase, event_id, person_id)
+    supabase.table("ticket_order").update({"status": "expired"}).eq(
+        "event_id", event_id
+    ).eq("person_id", person_id).eq("status", "pending").is_(
+        "stripe_checkout_session_id", "null"
+    ).execute()
 
 
 def user_has_pending_checkout(
@@ -225,7 +243,7 @@ def validate_booking(
     max_per_person = get_max_tickets_per_person(supabase, event_id)
     user_tickets = count_user_tickets(supabase, event_id, person_id)
     user_pending = count_user_pending_order_quantity(supabase, event_id, person_id)
-    if user_tickets + user_pending + quantity > max_per_person:
+    if max_per_person is not None and user_tickets + user_pending + quantity > max_per_person:
         raise ValueError("max_tickets_exceeded")
 
     if is_checkout:

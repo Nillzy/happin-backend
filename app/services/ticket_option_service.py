@@ -1,6 +1,7 @@
 """Ticket option business logic — UPSERT sync for pricing categories."""
 
 from app.core.supabase import get_supabase, get_supabase_for_user
+from app.services import payment_service
 
 
 def get_ticket_options(event_id: str) -> list[dict]:
@@ -25,6 +26,7 @@ def sync_ticket_options(event_id: str, options: list[dict], token: str) -> list[
     Synchronisiert anschließend `event.is_free` mit dem tatsächlichen Preis-Zustand:
     mindestens eine Option mit Preis > 0 ⇒ `is_free=False`, sonst `True`.
     """
+    payment_service.require_stripe_for_paid_public_tickets(event_id, options)
     supabase = get_supabase_for_user(token)
 
     existing = (

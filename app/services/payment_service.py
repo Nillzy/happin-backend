@@ -56,6 +56,77 @@ def get_host_stripe_account(event_id: str) -> dict | None:
     return person.data
 
 
+def _assert_host_stripe_ready(host_info: dict | None) -> None:
+    if not host_info or not host_info.get("stripe_connect_account_id"):
+        raise ValueError("host_not_onboarded")
+    if not host_info.get("stripe_connect_charges_enabled"):
+        raise ValueError("host_charges_not_enabled")
+
+
+def require_stripe_for_paid_public_event(event_id: str, *, is_public: bool | None = None) -> None:
+    """
+    Public events with paid ticket options require an active Stripe Connect account.
+    Free-only and private events are exempt.
+    """
+    supabase = get_supabase()
+
+    event_row = (
+        supabase.table("event")
+        .select("is_public")
+        .eq("event_id", event_id)
+        .maybe_single()
+        .execute()
+    )
+    if not event_row or not event_row.data:
+        raise ValueError("event_not_found")
+
+    effective_is_public = (
+        is_public if is_public is not None else event_row.data.get("is_public", True)
+    )
+    if not effective_is_public:
+        return
+
+    options = (
+        supabase.table("ticket_option")
+        .select("price")
+        .eq("event_id", event_id)
+        .execute()
+    )
+    has_paid = any(float(opt.get("price", 0) or 0) > 0 for opt in (options.data or []))
+    if not has_paid:
+        return
+
+    _assert_host_stripe_ready(get_host_stripe_account(event_id))
+
+
+def require_stripe_for_paid_public_tickets(
+    event_id: str, options: list[dict], *, is_public: bool | None = None
+) -> None:
+    """Validate Stripe Connect before saving paid ticket options on a public event."""
+    has_paid = any(float(opt.get("price", 0) or 0) > 0 for opt in options)
+    if not has_paid:
+        return
+
+    supabase = get_supabase()
+    event_row = (
+        supabase.table("event")
+        .select("is_public")
+        .eq("event_id", event_id)
+        .maybe_single()
+        .execute()
+    )
+    if not event_row or not event_row.data:
+        raise ValueError("event_not_found")
+
+    effective_is_public = (
+        is_public if is_public is not None else event_row.data.get("is_public", True)
+    )
+    if not effective_is_public:
+        return
+
+    _assert_host_stripe_ready(get_host_stripe_account(event_id))
+
+
 def create_checkout_session(
     *,
     event_id: str,
@@ -66,6 +137,8 @@ def create_checkout_session(
 ) -> dict:
     """Create a Stripe Checkout Session and a pending ticket_order."""
     supabase = get_supabase()
+
+    booking_service.clear_pending_checkouts(supabase, event_id, person_id)
 
     opt_data = booking_service.validate_booking(
         supabase,
@@ -86,10 +159,7 @@ def create_checkout_session(
     )
 
     host_info = get_host_stripe_account(event_id)
-    if not host_info or not host_info.get("stripe_connect_account_id"):
-        raise ValueError("host_not_onboarded")
-    if not host_info.get("stripe_connect_charges_enabled"):
-        raise ValueError("host_charges_not_enabled")
+    _assert_host_stripe_ready(host_info)
 
     destination_account = host_info["stripe_connect_account_id"]
     amount_total_cents = unit_price_cents * quantity
@@ -202,11 +272,43 @@ def fulfill_ticket_order(order_id: str, payment_intent_id: str | None = None) ->
     order = order_row.data
     status = order["status"]
 
-    if status in ("refunded", "expired", "failed"):
+    if status == "refunded":
+        return False
+
+    if status == "expired" and payment_intent_id:
+        update_data = {
+            "status": "paid",
+            "paid_at": datetime.now(timezone.utc).isoformat(),
+            "stripe_payment_intent_id": payment_intent_id,
+        }
+        claimed = (
+            supabase.table("ticket_order")
+            .update(update_data)
+            .eq("ticket_order_id", order_id)
+            .eq("status", "expired")
+            .execute()
+        )
+        if claimed.data:
+            status = "paid"
+        else:
+            order_row = (
+                supabase.table("ticket_order")
+                .select("*")
+                .eq("ticket_order_id", order_id)
+                .single()
+                .execute()
+            )
+            order = order_row.data
+            status = order["status"]
+
+    if status == "failed":
+        return False
+
+    if status in ("expired",):
         return False
 
     if status == "paid" and _order_has_tickets(supabase, order_id):
-        return False
+        return True
 
     if status not in ("pending", "paid"):
         return False
@@ -238,7 +340,7 @@ def fulfill_ticket_order(order_id: str, payment_intent_id: str | None = None) ->
             )
             order = order_row.data
             if order["status"] == "paid" and _order_has_tickets(supabase, order_id):
-                return False
+                return True
             should_create_tickets = order["status"] == "paid" and not _order_has_tickets(
                 supabase, order_id
             )

@@ -79,7 +79,7 @@ def _to_list_item(raw: dict) -> EventListItem:
         description=raw.get("description"),
         category=raw.get("category"),
         max_capacity=raw.get("max_capacity"),
-        max_tickets_per_person=raw.get("max_tickets_per_person", 1),
+        max_tickets_per_person=raw.get("max_tickets_per_person"),
         is_public=raw["is_public"],
         is_free=raw.get("is_free", True),
         status=raw.get("status", "published"),
@@ -217,7 +217,7 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         description=raw.get("description"),
         category=raw.get("category"),
         max_capacity=raw.get("max_capacity"),
-        max_tickets_per_person=raw.get("max_tickets_per_person", 1),
+        max_tickets_per_person=raw.get("max_tickets_per_person"),
         is_public=raw["is_public"],
         is_free=raw.get("is_free", True),
         status=raw.get("status", "published"),
@@ -325,6 +325,14 @@ async def update_event_endpoint(
         return _to_detail(raw)
     except HTTPException:
         raise
+    except ValueError as e:
+        error_map = {
+            "host_not_onboarded": (402, "Host has not completed payment setup"),
+            "host_charges_not_enabled": (402, "Host payment account is not yet active"),
+            "event_not_found": (404, "Event not found"),
+        }
+        code, detail = error_map.get(str(e), (400, str(e)))
+        raise HTTPException(status_code=code, detail=detail)
     except Exception as e:
         logger.exception("Event update error")
         raise HTTPException(status_code=500, detail=str(e))
@@ -386,7 +394,11 @@ async def rsvp_to_event(
             declined = True
         elif body.status == "Accepted":
             max_per_person = booking_service.get_max_tickets_per_person(supabase, event_id)
-            ticket_count = min(body.ticket_count, max_per_person)
+            ticket_count = (
+                body.ticket_count
+                if max_per_person is None
+                else min(body.ticket_count, max_per_person)
+            )
 
             booking_service.validate_booking(
                 supabase,
