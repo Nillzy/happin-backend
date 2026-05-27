@@ -203,13 +203,15 @@ def validate_booking(
 
     event_row = (
         supabase.table("event")
-        .select("max_capacity")
+        .select("max_capacity, cancelled_at")
         .eq("event_id", event_id)
         .maybe_single()
         .execute()
     )
     if not getattr(event_row, "data", None):
         raise ValueError("event_not_found")
+    if event_row.data.get("cancelled_at") is not None:
+        raise ValueError("event_cancelled")
 
     opt_data = None
     if ticket_option_id:

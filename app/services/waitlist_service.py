@@ -43,12 +43,12 @@ def join_waitlist(event_id: str, person_id: str, token: str) -> dict:
     # Validate event
     event_rows = (
         admin_sb.table("event")
-        .select("event_id, max_capacity, is_free, waitlist_promotion_hours, deleted_at")
+        .select("event_id, max_capacity, is_free, waitlist_promotion_hours, cancelled_at")
         .eq("event_id", event_id)
         .limit(1)
         .execute()
     )
-    if not event_rows.data or event_rows.data[0].get("deleted_at"):
+    if not event_rows.data or event_rows.data[0].get("cancelled_at"):
         raise ValueError("event_not_found")
     event_data = event_rows.data[0]
     if not event_data.get("max_capacity"):

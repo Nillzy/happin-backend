@@ -178,9 +178,17 @@ class TestCheckoutValidation:
             "event_id": "other-event",
         }
 
-        mock_sb.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = (
-            option_result
-        )
+        event_result = MagicMock()
+        event_result.data = {"max_capacity": None, "cancelled_at": None}
+
+        def table_side_effect(table_name):
+            tbl = MagicMock()
+            if table_name == "event":
+                tbl.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = event_result
+            tbl.select.return_value.eq.return_value.single.return_value.execute.return_value = option_result
+            return tbl
+
+        mock_sb.table.side_effect = table_side_effect
 
         from app.services.payment_service import create_checkout_session
 

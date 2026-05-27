@@ -22,6 +22,8 @@ def sync_custom_fields(event_id: str, fields: list[dict], token: str) -> list[di
     - Items without custom_field_id → INSERT
     - Existing IDs not in request → DELETE
     """
+    from app.services.event_service import _ensure_event_active
+    _ensure_event_active(event_id, token)
     supabase = get_supabase_for_user(token)
 
     existing = (

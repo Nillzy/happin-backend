@@ -10,7 +10,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.auth import get_current_user, get_current_user_optional
 from app.schemas.events import (
     EventCreate, EventUpdate, EventListItem, EventListResponse,
-    EventDetailResponse, RsvpRequest, RsvpResponse,
+    EventDetailResponse, RsvpRequest, RsvpResponse, RefundSummary,
 )
 from app.schemas.ticket_options import TicketOptionResponse
 from app.schemas.tickets import ScanTicketRequest, ScanTicketResponse
@@ -92,8 +92,8 @@ def _to_list_item(raw: dict) -> EventListItem:
         rsvp_declined=rsvp_declined,
         waitlist_count=waitlist_count,
         ticket_revenue_cents=revenue_cents,
-        is_deleted=raw.get("deleted_at") is not None,
-        deleted_at=raw.get("deleted_at"),
+        is_cancelled=raw.get("cancelled_at") is not None,
+        cancelled_at=raw.get("cancelled_at"),
         location_is_private=raw.get("location_is_private", False),
         accent_color_primary=raw.get("accent_color_primary"),
         accent_color_secondary=raw.get("accent_color_secondary"),
@@ -242,8 +242,8 @@ def _to_detail(raw: dict) -> EventDetailResponse:
         ],
         my_rsvp_status=raw.get("my_rsvp_status"),
         ticket=raw.get("my_tickets") or [],
-        is_deleted=raw.get("deleted_at") is not None,
-        deleted_at=raw.get("deleted_at"),
+        is_cancelled=raw.get("cancelled_at") is not None,
+        cancelled_at=raw.get("cancelled_at"),
         location_is_private=raw.get("location_is_private", False),
         accent_color_primary=raw.get("accent_color_primary"),
         accent_color_secondary=raw.get("accent_color_secondary"),
@@ -327,6 +327,7 @@ async def update_event_endpoint(
         raise
     except ValueError as e:
         error_map = {
+            "event_cancelled": (400, "Event wurde abgesagt und kann nicht mehr verändert werden"),
             "host_not_onboarded": (402, "Host has not completed payment setup"),
             "host_charges_not_enabled": (402, "Host payment account is not yet active"),
             "event_not_found": (404, "Event not found"),
@@ -340,6 +341,7 @@ async def update_event_endpoint(
 
 _RSVP_STATUS_ERRORS = {
     "event_not_found": (404, "Event not found"),
+    "event_cancelled": (400, "Event wurde abgesagt und kann nicht mehr verändert werden"),
     "event_in_past":   (400, "RSVP not possible after event has started"),
     "public_event_accepted_only": (400, "Public events only allow status 'Accepted'"),
     "event_full": (409, "Event is fully booked"),
@@ -620,20 +622,19 @@ async def get_waitlist_position(
         raise HTTPException(status_code=code, detail=detail)
 
 
-_DELETE_EVENT_ERRORS = {
-    "too_close_to_start": (400, "Event kann nicht gelöscht werden: Beginn ist weniger als 48h entfernt"),
-    "already_deleted": (400, "Event wurde bereits gelöscht"),
+_CANCEL_EVENT_ERRORS = {
+    "already_cancelled": (400, "Event wurde bereits abgesagt"),
     "event_not_found": (404, "Event nicht gefunden"),
 }
 
 
-@router.delete("/{event_id}", status_code=204)
-async def delete_event_endpoint(
+@router.post("/{event_id}/cancel", response_model=RefundSummary)
+async def cancel_event_endpoint(
     event_id: str,
     user=Depends(get_current_user),
     credentials=Depends(HTTPBearer()),
 ):
-    """Soft-delete an event. Only the host can delete. Event must start in > 48h."""
+    """Cancel an event. Only the host can cancel. Refunds all paid tickets via Stripe."""
     person = person_service.get_or_create_person(
         supabase_user_id=user.user.id,
         email=user.user.email,
@@ -642,15 +643,15 @@ async def delete_event_endpoint(
     person_id = person["person_id"]
 
     try:
-        event_service.delete_event(
+        return event_service.cancel_event(
             event_id=event_id,
             person_id=person_id,
             token=credentials.credentials,
         )
     except PermissionError:
-        raise HTTPException(status_code=403, detail="Nur der Host kann dieses Event löschen")
+        raise HTTPException(status_code=403, detail="Nur der Host kann dieses Event absagen")
     except ValueError as e:
-        code, detail = _DELETE_EVENT_ERRORS.get(str(e), (400, str(e)))
+        code, detail = _CANCEL_EVENT_ERRORS.get(str(e), (400, str(e)))
         raise HTTPException(status_code=code, detail=detail)
 
 

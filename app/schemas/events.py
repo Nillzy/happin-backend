@@ -202,8 +202,8 @@ class EventListItem(BaseModel):
     rsvp_declined: int = 0
     waitlist_count: int = 0
     ticket_revenue_cents: int = 0
-    is_deleted: bool = False
-    deleted_at: datetime | None = None
+    is_cancelled: bool = False
+    cancelled_at: datetime | None = None
     location_is_private: bool = False
     accent_color_primary: str | None = None
     accent_color_secondary: str | None = None
@@ -245,3 +245,11 @@ class RsvpResponse(BaseModel):
     event_id: str
     person_id: str
     status: str
+
+
+class RefundSummary(BaseModel):
+    """Result of cancelling an event with paid ticket orders."""
+    refunded_count: int = 0
+    failed_count: int = 0
+    failed_order_ids: list[str] = []
+    skipped_count: int = 0

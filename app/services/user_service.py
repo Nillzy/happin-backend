@@ -1,6 +1,6 @@
 """User account business logic — stats, events, tickets, account deletion."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from app.core.supabase import get_supabase, get_supabase_for_user
 
@@ -60,7 +60,6 @@ def get_user_events(
 ) -> list[dict]:
     supabase = get_supabase_for_user(token)
     now = datetime.now(timezone.utc).isoformat()
-    delete_cutoff = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
 
     events: list[dict] = []
 
@@ -79,7 +78,6 @@ def get_user_events(
                 supabase.table("event")
                 .select("*, location(*), event_media(media_url), event_host(person_id), ticket(ticket_id, ticket_option(price)), event_participation(status)")
                 .in_("event_id", host_event_ids)
-                .or_(f"deleted_at.is.null,deleted_at.gt.{delete_cutoff}")
             )
             if period == "upcoming":
                 query = query.gte("starts_at", now)
@@ -150,7 +148,6 @@ def get_user_events(
                 supabase.table("event")
                 .select("*, location(*), event_media(media_url), event_host(person_id), ticket(ticket_id, ticket_option(price))")
                 .in_("event_id", attendee_event_ids)
-                .or_(f"deleted_at.is.null,deleted_at.gt.{delete_cutoff}")
             )
             if period == "upcoming":
                 query = query.gte("starts_at", now)
