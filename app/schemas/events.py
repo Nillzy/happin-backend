@@ -54,6 +54,7 @@ class EventCreate(BaseModel):
     accent_color_primary: str | None = None
     accent_color_secondary: str | None = None
     location_is_private: bool = False
+    show_weather_forecast: bool = False
 
     @field_validator("title")
     @classmethod
@@ -125,6 +126,7 @@ class EventUpdate(BaseModel):
     location_is_private: bool | None = None
     accent_color_primary: str | None = None
     accent_color_secondary: str | None = None
+    show_weather_forecast: bool | None = None
 
     @field_validator("title")
     @classmethod
@@ -222,6 +224,8 @@ class EventDetailResponse(EventListItem):
     custom_fields: list[CustomFieldResponse] = []
     my_rsvp_status: Optional[str] = None
     ticket: list[dict] = []
+    show_weather_forecast: bool = False
+    weather_forecast: dict | None = None
 
 
 class RsvpRequest(BaseModel):
