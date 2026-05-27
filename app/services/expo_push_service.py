@@ -27,26 +27,23 @@ def upsert_token(
     token: str,
     platform: str,
     user_agent: str | None,
-    auth_token: str,
+    auth_token: str,  # noqa: ARG001 — Signatur stabil halten, Service nutzt Admin-Client
 ) -> None:
     """Speichert/aktualisiert einen Expo-Push-Token.
 
-    Dedupe-Logik: Wenn die Person bereits einen Token mit gleichem `user_agent`
-    hat (gleiches Gerät, neuer Token nach Reinstall), wird der alte gelöscht.
+    `token` ist global unique (1 Gerät = 1 Zeile). Beim Login auf einem Gerät,
+    das bereits einer anderen Person gehört, wird `person_id` per Upsert
+    übertragen. Admin-Client ist nötig, weil die UPDATE-RLS-Policy am alten
+    Owner hängt.
     """
-    sb = get_supabase_for_user(auth_token)
-    if user_agent:
-        sb.table("expo_push_token").delete().eq("person_id", person_id).eq(
-            "user_agent", user_agent
-        ).neq("token", token).execute()
-    sb.table("expo_push_token").upsert(
+    get_supabase_admin().table("expo_push_token").upsert(
         {
             "person_id": person_id,
             "token": token,
             "platform": platform,
             "user_agent": user_agent,
         },
-        on_conflict="person_id,token",
+        on_conflict="token",
     ).execute()
 
 
@@ -55,6 +52,36 @@ def delete_token(person_id: str, token: str, auth_token: str) -> None:
     sb.table("expo_push_token").delete().eq("person_id", person_id).eq(
         "token", token
     ).execute()
+
+
+def list_tokens(person_id: str, auth_token: str) -> list[dict]:
+    """Liefert alle Expo-Push-Tokens des Users für die Geräte-Verwaltung.
+
+    Gibt bewusst NICHT den vollen `token`-String zurück — er identifiziert
+    das Gerät beim Push-Provider und gehört nicht in die UI.
+    """
+    sb = get_supabase_for_user(auth_token)
+    res = (
+        sb.table("expo_push_token")
+        .select("expo_push_token_id, platform, user_agent, created_at")
+        .eq("person_id", person_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return res.data or []
+
+
+def delete_token_by_id(person_id: str, token_id: str, auth_token: str) -> bool:
+    """Löscht einen Token per ID. RLS sorgt dafür, dass nur eigene Einträge gehen."""
+    sb = get_supabase_for_user(auth_token)
+    res = (
+        sb.table("expo_push_token")
+        .delete()
+        .eq("person_id", person_id)
+        .eq("expo_push_token_id", token_id)
+        .execute()
+    )
+    return bool(res.data)
 
 
 def _delete_token_admin(token: str) -> None:

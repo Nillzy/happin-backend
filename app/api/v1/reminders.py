@@ -1,6 +1,6 @@
 """Reminder-Endpoints (Anforderung K4): Präferenzen + Web-Push-Subscriptions."""
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
 from app.core.auth import get_current_user
@@ -8,11 +8,15 @@ from app.core.config import settings
 from app.schemas.reminder import (
     ExpoPushTokenCreate,
     ExpoPushTokenDelete,
+    ExpoPushTokenItem,
+    ExpoPushTokenListResponse,
     ReminderPreferenceResponse,
     ReminderPreferenceUpdate,
     VapidPublicKeyResponse,
     WebPushSubscriptionCreate,
     WebPushSubscriptionDelete,
+    WebPushSubscriptionItem,
+    WebPushSubscriptionListResponse,
 )
 from app.services import expo_push_service, person_service, reminder_service
 
@@ -117,3 +121,68 @@ async def delete_expo_push_token(
 ):
     person = person_service.get_or_create_person(user.user.id, user.user.email, token)
     expo_push_service.delete_token(person["person_id"], body.token, token)
+
+
+# ── Geräte-Verwaltung ────────────────────────────────────────────────
+
+
+@router.get(
+    "/me/web-push-subscriptions",
+    response_model=WebPushSubscriptionListResponse,
+)
+async def list_my_web_push_subscriptions(
+    user=Depends(get_current_user),
+    token: str = Depends(_token),
+):
+    """Liefert alle Web-Push-Subscriptions des Users (für Geräte-Verwaltung)."""
+    person = person_service.get_or_create_person(user.user.id, user.user.email, token)
+    rows = reminder_service.list_subscriptions(person["person_id"], token)
+    return WebPushSubscriptionListResponse(
+        items=[WebPushSubscriptionItem(**r) for r in rows]
+    )
+
+
+@router.delete(
+    "/me/web-push-subscriptions/{subscription_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_my_web_push_subscription(
+    subscription_id: str,
+    user=Depends(get_current_user),
+    token: str = Depends(_token),
+):
+    person = person_service.get_or_create_person(user.user.id, user.user.email, token)
+    ok = reminder_service.delete_subscription_by_id(
+        person["person_id"], token, subscription_id
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="subscription_not_found")
+
+
+@router.get(
+    "/me/expo-push-tokens",
+    response_model=ExpoPushTokenListResponse,
+)
+async def list_my_expo_push_tokens(
+    user=Depends(get_current_user),
+    token: str = Depends(_token),
+):
+    """Liefert alle Expo-Push-Tokens des Users (für Geräte-Verwaltung)."""
+    person = person_service.get_or_create_person(user.user.id, user.user.email, token)
+    rows = expo_push_service.list_tokens(person["person_id"], token)
+    return ExpoPushTokenListResponse(items=[ExpoPushTokenItem(**r) for r in rows])
+
+
+@router.delete(
+    "/me/expo-push-tokens/{token_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_my_expo_push_token(
+    token_id: str,
+    user=Depends(get_current_user),
+    token: str = Depends(_token),
+):
+    person = person_service.get_or_create_person(user.user.id, user.user.email, token)
+    ok = expo_push_service.delete_token_by_id(person["person_id"], token_id, token)
+    if not ok:
+        raise HTTPException(status_code=404, detail="token_not_found")
