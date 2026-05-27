@@ -5,7 +5,7 @@ import secrets
 from datetime import datetime, timezone, UTC, timedelta
 
 from app.core.supabase import get_supabase, get_supabase_for_user, get_supabase_admin
-from app.services import person_service
+from app.services import person_service, payment_service
 from app.services.geocoding_service import geocode_address
 
 logger = logging.getLogger(__name__)
@@ -398,6 +398,7 @@ def create_event(data: dict, person_id: str, token: str, supabase_user_id: str |
         "description": data.get("description"),
         "category": data.get("category"),
         "max_capacity": data.get("max_capacity"),
+        "max_tickets_per_person": data.get("max_tickets_per_person"),
         "is_public": data["is_public"],
         "is_free": data.get("is_free", True),
         "status": data.get("status", "published"),
@@ -562,6 +563,11 @@ def update_event(event_id: str, data: dict, person_id: str, token: str, supabase
         event_patch[key] = _isoformat(value) if hasattr(value, "isoformat") else value
 
     if event_patch:
+        if data.get("is_public") is True:
+            payment_service.require_stripe_for_paid_public_event(event_id, is_public=True)
+        elif data.get("status") == "published":
+            payment_service.require_stripe_for_paid_public_event(event_id)
+
         supabase.table("event").update(event_patch).eq("event_id", event_id).execute()
 
     if data.get("is_free") is True:

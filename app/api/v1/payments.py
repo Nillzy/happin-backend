@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.supabase import get_supabase_admin
-from app.services import payment_service, person_service
+from app.services import payment_service, person_service, stripe_webhook_service
 from app.adapters import stripe_payment
 from app.schemas.payments import (
     CreateCheckoutSessionRequest,
@@ -268,114 +268,24 @@ async def stripe_webhook(request: Request):
         logger.warning("Webhook signature verification failed")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    event_type = event.type
-    data = event.data.object
-    logger.info("Webhook received: %s", event_type)
+    logger.info("Webhook received: %s (%s)", event.type, event.id)
 
     try:
-        if event_type == "checkout.session.completed":
-            _handle_checkout_completed(data)
-        elif event_type == "checkout.session.async_payment_succeeded":
-            _handle_async_payment_succeeded(data)
-        elif event_type == "checkout.session.async_payment_failed":
-            _handle_async_payment_failed(data)
-        elif event_type == "checkout.session.expired":
-            _handle_checkout_expired(data)
-        elif event_type == "payment_intent.succeeded":
-            _handle_payment_intent_succeeded(data)
-        elif event_type == "account.updated":
-            _handle_account_updated(data)
-        elif event_type in ("payout.paid", "payout.failed"):
-            logger.info("Payout event: %s", event_type)
-        else:
-            logger.debug("Unhandled event type: %s", event_type)
+        result = stripe_webhook_service.ingest_and_process_webhook(
+            stripe_event=event,
+            raw_payload=payload,
+        )
+        return result
+    except stripe_webhook_service.WebhookProcessingError as exc:
+        logger.error("Webhook processing failed permanently: %s", exc)
+        return {
+            "received": True,
+            "status": "failed",
+            "detail": str(exc),
+        }
     except Exception:
-        logger.exception("Webhook handler failed for event: %s", event_type)
+        logger.exception("Webhook processing failed for event: %s", event.id)
         raise HTTPException(status_code=500, detail="Webhook processing failed")
-
-    return {"received": True}
-
-
-def _handle_checkout_completed(session) -> None:
-    """Fulfill only if payment_status is 'paid' (synchronous payment methods)."""
-    order_id = (session.metadata or {}).get("ticket_order_id")
-    if not order_id:
-        return
-    if session.payment_status == "paid":
-        payment_service.fulfill_ticket_order(
-            order_id, payment_intent_id=session.payment_intent
-        )
-    # If payment_status is 'unpaid', wait for async_payment_succeeded
-
-
-def _handle_async_payment_succeeded(session) -> None:
-    """Fulfill for delayed payment methods (SEPA, etc.)."""
-    order_id = (session.metadata or {}).get("ticket_order_id")
-    if not order_id:
-        return
-    payment_service.fulfill_ticket_order(
-        order_id, payment_intent_id=session.payment_intent
-    )
-
-
-def _handle_async_payment_failed(session) -> None:
-    metadata = session.metadata or {}
-    order_id = metadata.get("ticket_order_id")
-    event_id = metadata.get("event_id")
-    if order_id:
-        payment_service.fail_ticket_order(order_id)
-        if event_id:
-            try:
-                from app.services.waitlist_service import promote_next
-                promote_next(event_id)
-            except Exception:
-                logger.exception("promote_next failed after payment failed for event %s", event_id)
-
-
-def _handle_checkout_expired(session) -> None:
-    metadata = session.metadata or {}
-    order_id = metadata.get("ticket_order_id")
-    event_id = metadata.get("event_id")
-    if order_id:
-        payment_service.expire_ticket_order(order_id)
-        if event_id:
-            try:
-                from app.services.waitlist_service import promote_next
-                promote_next(event_id)
-            except Exception:
-                logger.exception("promote_next failed after checkout expired for event %s", event_id)
-
-
-def _handle_payment_intent_succeeded(payment_intent) -> None:
-    """Store payment intent on order; fulfillment is via checkout session webhooks."""
-    order_id = (payment_intent.metadata or {}).get("ticket_order_id")
-    if not order_id:
-        return
-    supabase = get_supabase_admin()
-    supabase.table("ticket_order").update({
-        "stripe_payment_intent_id": payment_intent.id,
-    }).eq("ticket_order_id", order_id).is_("stripe_payment_intent_id", "null").execute()
-
-
-def _handle_account_updated(account) -> None:
-    """Sync charges_enabled/payouts_enabled to person table."""
-    supabase = get_supabase_admin()
-    account_id = account.id
-    charges_enabled = getattr(account, "charges_enabled", False)
-    payouts_enabled = getattr(account, "payouts_enabled", False)
-
-    update_data: dict = {
-        "stripe_connect_charges_enabled": charges_enabled,
-        "stripe_connect_payouts_enabled": payouts_enabled,
-    }
-    if charges_enabled and payouts_enabled:
-        update_data["stripe_connect_onboarding_completed_at"] = (
-            datetime.now(timezone.utc).isoformat()
-        )
-
-    supabase.table("person").update(update_data).eq(
-        "stripe_connect_account_id", account_id
-    ).execute()
 
 
 # ── Payment Summary & Payouts ─────────────────────────────────────────────────

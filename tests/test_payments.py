@@ -39,8 +39,8 @@ class TestFulfillmentIdempotency:
     """Test that fulfillment is idempotent."""
 
     @patch("app.services.payment_service.get_supabase")
-    def test_already_paid_order_returns_false(self, mock_get_supabase):
-        """If order is already paid with tickets, fulfill should return False (no-op)."""
+    def test_already_paid_order_returns_true(self, mock_get_supabase):
+        """If order is already paid with tickets, fulfill is a successful no-op (idempotent)."""
         mock_sb = MagicMock()
         mock_get_supabase.return_value = mock_sb
 
@@ -69,7 +69,7 @@ class TestFulfillmentIdempotency:
 
         from app.services.payment_service import fulfill_ticket_order
         result = fulfill_ticket_order("order-1")
-        assert result is False
+        assert result is True
 
 
 class TestCancelTicketOrder:

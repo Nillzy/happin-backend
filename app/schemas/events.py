@@ -44,7 +44,7 @@ class EventCreate(BaseModel):
     description: str | None = None
     category: str | None = None
     max_capacity: int | None = None
-    max_tickets_per_person: int | None = 1
+    max_tickets_per_person: int | None = None
     is_public: bool
     is_free: bool = True
     location: LocationCreate
@@ -189,7 +189,7 @@ class EventListItem(BaseModel):
     description: str | None = None
     category: str | None = None
     max_capacity: int | None = None
-    max_tickets_per_person: int | None = 1
+    max_tickets_per_person: int | None = None
     is_public: bool
     is_free: bool = True
     status: str = "published"
