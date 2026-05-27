@@ -140,9 +140,31 @@ def test_list_events_returns_data(client, mock_supabase, auth_headers):
     assert event["location"]["city"] == "Berlin"
 
 
-def test_get_event_detail_found(client, mock_supabase):
+def test_get_event_detail_found(client, auth_headers, mock_supabase):
     _mock_chain(mock_supabase, [MOCK_EVENT_RAW])
-    response = client.get("/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322")
+
+    # Separate client mock for get_supabase_for_user: event query returns data, person query returns None
+    user_supabase = MagicMock()
+    detail_response = MagicMock()
+    detail_response.data = MOCK_EVENT_RAW
+    person_response = MagicMock()
+    person_response.data = None
+
+    def user_select_side_effect(*args, **kwargs):
+        result = MagicMock()
+        if args and args[0] == "person_id":
+            result.eq.return_value.maybe_single.return_value.execute.return_value = person_response
+        else:
+            result.eq.return_value.maybe_single.return_value.execute.return_value = detail_response
+        return result
+
+    user_supabase.table.return_value.select.side_effect = user_select_side_effect
+
+    with patch("app.services.event_service.get_supabase_for_user", return_value=user_supabase):
+        response = client.get(
+            "/api/v1/events/35b43254-4e21-459f-b729-4cb3966cf322",
+            headers=auth_headers,
+        )
     assert response.status_code == 200
     body = response.json()
     assert body["event_id"] == "35b43254-4e21-459f-b729-4cb3966cf322"
@@ -153,9 +175,17 @@ def test_get_event_detail_found(client, mock_supabase):
     assert body["ends_at"] is None
 
 
-def test_get_event_detail_not_found(client, mock_supabase):
-    _mock_chain(mock_supabase, [])
-    response = client.get("/api/v1/events/00000000-0000-0000-0000-000000000000")
+def test_get_event_detail_not_found(client, auth_headers, mock_supabase):
+    not_found_supabase = MagicMock()
+    not_found_response = MagicMock()
+    not_found_response.data = None
+    not_found_supabase.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = not_found_response
+
+    with patch("app.services.event_service.get_supabase_for_user", return_value=not_found_supabase):
+        response = client.get(
+            "/api/v1/events/00000000-0000-0000-0000-000000000000",
+            headers=auth_headers,
+        )
     assert response.status_code == 404
 
 
