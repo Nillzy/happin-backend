@@ -53,7 +53,7 @@ def persist_webhook_event(*, stripe_event_id: str, event_type: str, payload: dic
             .maybe_single()
             .execute()
         )
-        if existing.data:
+        if existing is not None and existing.data:
             return existing.data
 
         inserted = (
@@ -69,6 +69,8 @@ def persist_webhook_event(*, stripe_event_id: str, event_type: str, payload: dic
             )
             .execute()
         )
+        if not inserted.data:
+            raise WebhookProcessingError("Failed to persist stripe webhook event")
         return inserted.data[0]
     except Exception as exc:
         code = getattr(exc, "code", None)

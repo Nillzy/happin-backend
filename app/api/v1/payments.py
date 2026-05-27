@@ -186,12 +186,30 @@ async def create_checkout_session(
             "event_not_found": (404, "Event not found"),
             "ticket_option_sold_out": (409, "Ticket option sold out"),
             "max_tickets_exceeded": (409, "Maximum tickets per person exceeded"),
+            "checkout_processing": (409, "Payment is being processed for this event"),
             "checkout_pending": (409, "You already have a pending checkout for this event"),
             "host_not_onboarded": (402, "Host has not completed payment setup"),
             "host_charges_not_enabled": (402, "Host payment account is not yet active"),
         }
         code, detail = error_map.get(str(e), (400, str(e)))
         raise HTTPException(status_code=code, detail=detail)
+
+
+@router.post("/events/{event_id}/checkout-session/abandon")
+async def abandon_checkout_session(
+    event_id: str,
+    user=Depends(get_current_user),
+    credentials=Depends(HTTPBearer()),
+):
+    """Expire the user's open checkout session for this event (e.g. after cancel)."""
+    token = credentials.credentials
+    person = person_service.get_or_create_person(
+        supabase_user_id=user.user.id,
+        email=user.user.email,
+        token=token,
+    )
+    payment_service.abandon_checkout(event_id=event_id, person_id=person["person_id"])
+    return {"abandoned": True}
 
 
 @router.get(

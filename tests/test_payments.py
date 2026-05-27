@@ -96,6 +96,69 @@ class TestCancelTicketOrder:
             cancel_ticket_order("e1", "p1")
 
 
+class TestAbandonCheckout:
+    @patch("app.services.payment_service.stripe_payment.expire_checkout_session")
+    @patch("app.services.payment_service.stripe_payment.retrieve_checkout_session")
+    @patch("app.services.payment_service.get_supabase")
+    def test_abandon_expires_open_session(
+        self, mock_get_supabase, mock_retrieve, mock_expire
+    ):
+        mock_sb = MagicMock()
+        mock_get_supabase.return_value = mock_sb
+        pending = MagicMock()
+        pending.data = [{
+            "ticket_order_id": "order-1",
+            "event_id": "event-a",
+            "stripe_checkout_session_id": "cs_test_1",
+        }]
+        mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.execute.return_value = pending
+        mock_retrieve.return_value = MagicMock(status="open")
+
+        from app.services.payment_service import abandon_checkout
+
+        assert abandon_checkout(event_id="event-a", person_id="p1") is True
+        mock_expire.assert_called_once_with("cs_test_1")
+
+
+class TestCreateCheckoutSession:
+    @patch("app.services.payment_service.abandon_checkout")
+    @patch("app.services.payment_service.sync_pending_checkouts")
+    @patch("app.services.payment_service.booking_service.expire_stale_pending_orders")
+    @patch("app.services.payment_service.get_host_stripe_account")
+    @patch("app.services.payment_service.get_supabase")
+    def test_create_checkout_abandons_existing_session(
+        self,
+        mock_get_supabase,
+        mock_host,
+        _mock_expire_stale,
+        _mock_sync,
+        mock_abandon,
+    ):
+        mock_sb = MagicMock()
+        mock_get_supabase.return_value = mock_sb
+        mock_host.return_value = {
+            "stripe_connect_account_id": "acct_1",
+            "stripe_connect_charges_enabled": True,
+        }
+        mock_abandon.return_value = True
+
+        with patch(
+            "app.services.payment_service.booking_service.validate_booking",
+            side_effect=ValueError("ticket_option_wrong_event"),
+        ):
+            from app.services.payment_service import create_checkout_session
+
+            with pytest.raises(ValueError, match="ticket_option_wrong_event"):
+                create_checkout_session(
+                    event_id="event-a",
+                    person_id="p1",
+                    ticket_option_id="opt-1",
+                    quantity=1,
+                )
+
+        mock_abandon.assert_called_once_with(event_id="event-a", person_id="p1")
+
+
 class TestCheckoutValidation:
     @patch("app.services.payment_service.get_host_stripe_account")
     @patch("app.services.payment_service.get_supabase")

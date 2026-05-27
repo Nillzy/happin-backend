@@ -248,6 +248,6 @@ def validate_booking(
 
     if is_checkout:
         if user_has_pending_checkout(supabase, event_id, person_id):
-            raise ValueError("checkout_pending")
+            raise ValueError("checkout_processing")
 
     return opt_data
