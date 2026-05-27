@@ -319,15 +319,31 @@ def _handle_async_payment_succeeded(session) -> None:
 
 
 def _handle_async_payment_failed(session) -> None:
-    order_id = (session.metadata or {}).get("ticket_order_id")
+    metadata = session.metadata or {}
+    order_id = metadata.get("ticket_order_id")
+    event_id = metadata.get("event_id")
     if order_id:
         payment_service.fail_ticket_order(order_id)
+        if event_id:
+            try:
+                from app.services.waitlist_service import promote_next
+                promote_next(event_id)
+            except Exception:
+                logger.exception("promote_next failed after payment failed for event %s", event_id)
 
 
 def _handle_checkout_expired(session) -> None:
-    order_id = (session.metadata or {}).get("ticket_order_id")
+    metadata = session.metadata or {}
+    order_id = metadata.get("ticket_order_id")
+    event_id = metadata.get("event_id")
     if order_id:
         payment_service.expire_ticket_order(order_id)
+        if event_id:
+            try:
+                from app.services.waitlist_service import promote_next
+                promote_next(event_id)
+            except Exception:
+                logger.exception("promote_next failed after checkout expired for event %s", event_id)
 
 
 def _handle_payment_intent_succeeded(payment_intent) -> None:

@@ -41,6 +41,8 @@ def _mock_supabase_for_validate(*, event_id: str, max_capacity: int | None, max_
             t.select.return_value.eq.return_value.eq.return_value.not_.return_value.is_.return_value.limit.return_value.execute.return_value = MagicMock(
                 data=[]
             )
+        elif name == "event_waitlist":
+            t.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
         return t
 
     mock_sb.table.side_effect = table_side_effect
@@ -111,6 +113,8 @@ class TestValidateBooking:
                 t.select.return_value.eq.return_value.eq.return_value.not_.return_value.is_.return_value.limit.return_value.execute.return_value = MagicMock(
                     data=[]
                 )
+            elif name == "event_waitlist":
+                t.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
             return t
 
         mock_sb.table.side_effect = table_side_effect
