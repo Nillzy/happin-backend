@@ -1,7 +1,7 @@
 """API v1 main router - aggregates all sub-routers."""
 
 from fastapi import APIRouter
-from app.api.v1 import user, users, events, ticket_options, tickets, images, custom_fields, payments, reminders
+from app.api.v1 import user, users, events, ticket_options, tickets, images, custom_fields, payments, reminders, notifications
 
 # Create main v1 router
 router = APIRouter(prefix="/api/v1")
@@ -32,6 +32,9 @@ router.include_router(payments.router, tags=["payments"])
 
 # Include reminders router (Anforderung K4 — Erinnerungen vor Eventbeginn)
 router.include_router(reminders.router, prefix="/users", tags=["reminders"])
+
+# Include notifications router (In-App-Benachrichtigungen für Event-Edit/Cancel/Neue Teilnehmer)
+router.include_router(notifications.router, prefix="/users", tags=["notifications"])
 
 
 @router.get("/health")

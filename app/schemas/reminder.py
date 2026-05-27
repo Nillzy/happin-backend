@@ -30,3 +30,13 @@ class WebPushSubscriptionDelete(BaseModel):
 
 class VapidPublicKeyResponse(BaseModel):
     public_key: str | None
+
+
+class ExpoPushTokenCreate(BaseModel):
+    token: str
+    platform: str = Field(pattern="^(ios|android)$")
+    user_agent: str | None = None
+
+
+class ExpoPushTokenDelete(BaseModel):
+    token: str

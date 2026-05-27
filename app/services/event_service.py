@@ -1,5 +1,6 @@
 """Event-related business logic and Supabase queries."""
 
+import logging
 import secrets
 from datetime import datetime, timezone, UTC, timedelta
 
@@ -417,6 +418,18 @@ def update_event(event_id: str, data: dict, person_id: str, token: str, supabase
     if not host_entry.data:
         return None
 
+    # Felder, die der Caller explizit ändern wollte — Basis für die Notification-Diff.
+    # `location` und `image_url`/`media_urls` werden auf "location" bzw. "media" verdichtet.
+    changed_fields: list[str] = []
+    for key in data.keys():
+        if key == "location":
+            changed_fields.append("location")
+        elif key in ("image_url", "media_urls"):
+            if "media" not in changed_fields:
+                changed_fields.append("media")
+        else:
+            changed_fields.append(key)
+
     location_data = data.pop("location", None)
     if location_data:
         event_row = (
@@ -523,11 +536,24 @@ def update_event(event_id: str, data: dict, person_id: str, token: str, supabase
     if data.get("is_free") is True:
         supabase.table("ticket_option").delete().eq("event_id", event_id).execute()
 
+    if changed_fields:
+        try:
+            from app.services import notification_service
+            notification_service.fanout_event_updated(event_id, changed_fields)
+        except Exception:
+            # Notification-Fehler dürfen das Update nicht killen
+            import logging
+            logging.getLogger(__name__).exception("[notifications] fanout_event_updated fehlgeschlagen")
+
     return get_event_by_id(event_id, supabase_user_id=supabase_user_id, token=token)
 
 
 def rsvp_event(event_id: str, supabase_user_id: str, email: str | None, status: str, token: str) -> dict:
     """Create or update a guest RSVP for an event."""
+    logging.getLogger(__name__).warning(
+        "[rsvp] ENTER rsvp_event event=%s status=%s user=%s",
+        event_id, status, supabase_user_id,
+    )
     supabase = get_supabase_for_user(token)
 
     person = person_service.get_or_create_person(supabase_user_id, email, token)
@@ -551,6 +577,17 @@ def rsvp_event(event_id: str, supabase_user_id: str, email: str | None, status: 
     if event_row.data["is_public"] and status == "Pending":
         raise ValueError("public_event_accepted_only")
 
+    # Vor-Status snapshotten — bestimmt, ob bei 'Accepted' eine Notification an den Host fällig ist.
+    prev_participation = (
+        supabase.table("event_participation")
+        .select("status")
+        .eq("event_id", event_id)
+        .eq("person_id", person_id)
+        .maybe_single()
+        .execute()
+    )
+    prev_status = (prev_participation.data or {}).get("status") if prev_participation else None
+
     result = supabase.rpc("rsvp_to_event", {
         "p_event_id": event_id,
         "p_person_id": person_id,
@@ -569,6 +606,33 @@ def rsvp_event(event_id: str, supabase_user_id: str, email: str | None, status: 
         .single()
         .execute()
     )
+
+    if participation.data and participation.data.get("status") == "Accepted" and prev_status != "Accepted":
+        try:
+            from app.services import notification_service
+            logging.getLogger(__name__).info(
+                "[rsvp] Trigger fanout_new_participant: event=%s person=%s prev=%s",
+                event_id, person_id, prev_status,
+            )
+            notification_service.fanout_new_participant(event_id, person_id)
+        except Exception:
+            logging.getLogger(__name__).exception("[notifications] fanout_new_participant fehlgeschlagen")
+    elif participation.data and participation.data.get("status") == "Declined" and prev_status == "Accepted":
+        try:
+            from app.services import notification_service
+            logging.getLogger(__name__).info(
+                "[rsvp] Trigger fanout_participant_cancelled: event=%s person=%s",
+                event_id, person_id,
+            )
+            notification_service.fanout_participant_cancelled(event_id, person_id)
+        except Exception:
+            logging.getLogger(__name__).exception("[notifications] fanout_participant_cancelled fehlgeschlagen")
+    else:
+        logging.getLogger(__name__).info(
+            "[rsvp] Kein Fanout: status=%s prev_status=%s",
+            (participation.data or {}).get("status"), prev_status,
+        )
+
     return participation.data
 
 
@@ -740,3 +804,10 @@ def delete_event(event_id: str, person_id: str, token: str) -> None:
     supabase.table("event").update(
         {"deleted_at": datetime.now(UTC).isoformat()}
     ).eq("event_id", event_id).execute()
+
+    try:
+        from app.services import notification_service
+        notification_service.fanout_event_cancelled(event_id)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("[notifications] fanout_event_cancelled fehlgeschlagen")

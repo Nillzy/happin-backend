@@ -6,13 +6,15 @@ from fastapi.security import HTTPBearer
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.schemas.reminder import (
+    ExpoPushTokenCreate,
+    ExpoPushTokenDelete,
     ReminderPreferenceResponse,
     ReminderPreferenceUpdate,
     VapidPublicKeyResponse,
     WebPushSubscriptionCreate,
     WebPushSubscriptionDelete,
 )
-from app.services import person_service, reminder_service
+from app.services import expo_push_service, person_service, reminder_service
 
 router = APIRouter()
 _bearer = HTTPBearer()
@@ -82,3 +84,36 @@ async def delete_web_push_subscription(
 async def get_vapid_public_key():
     """Public-Key für Web-Push-Subscriptions im Browser. Kein Auth nötig."""
     return VapidPublicKeyResponse(public_key=settings.VAPID_PUBLIC_KEY)
+
+
+@router.post(
+    "/me/expo-push-tokens",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def register_expo_push_token(
+    body: ExpoPushTokenCreate,
+    user=Depends(get_current_user),
+    token: str = Depends(_token),
+):
+    """Native iOS/Android: Expo-Push-Token registrieren."""
+    person = person_service.get_or_create_person(user.user.id, user.user.email, token)
+    expo_push_service.upsert_token(
+        person_id=person["person_id"],
+        token=body.token,
+        platform=body.platform,
+        user_agent=body.user_agent,
+        auth_token=token,
+    )
+
+
+@router.delete(
+    "/me/expo-push-tokens",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_expo_push_token(
+    body: ExpoPushTokenDelete,
+    user=Depends(get_current_user),
+    token: str = Depends(_token),
+):
+    person = person_service.get_or_create_person(user.user.id, user.user.email, token)
+    expo_push_service.delete_token(person["person_id"], body.token, token)
