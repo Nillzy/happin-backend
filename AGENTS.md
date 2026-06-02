@@ -1,7 +1,9 @@
 ## Commands
 
 ```bash
-# Development (localhost only)
+# Development (localhost only) — baut Doku wenn DEBUG=true
+./scripts/start_dev.sh
+# oder direkt:
 uvicorn app.main:app --reload --port 8001
 
 # Development (accessible from network - for physical device testing)
