@@ -33,8 +33,8 @@ app = FastAPI(
     title="Happin Backend API",
     description="Backend API for Happin Event Discovery Platform",
     version="1.0.0",
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
+    docs_url="/api/docs" if settings.DEBUG else None,
+    redoc_url="/api/redoc" if settings.DEBUG else None,
     debug=settings.DEBUG,
     lifespan=lifespan,
 )
@@ -56,7 +56,7 @@ async def root():
     return {
         "message": "Happin Backend API",
         "version": "1.0.0",
-        "docs": "/docs" if settings.DEBUG else "disabled",
+        "docs": "/api/docs" if settings.DEBUG else "disabled",
         "health": "/health",
     }
 
@@ -74,4 +74,8 @@ app.include_router(api_v1_router)
 
 static_dir = Path(__file__).resolve().parent.parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+docs_dir = Path(__file__).resolve().parent.parent / "site"
+if settings.DEBUG and docs_dir.exists():
+    app.mount("/docs", StaticFiles(directory=docs_dir, html=True), name="docs")
 
