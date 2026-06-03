@@ -265,7 +265,14 @@ def get_public_events_count() -> int:
 
 
 def get_event_by_id(event_id: str, supabase_user_id: str | None = None, token: str | None = None) -> dict | None:
-    supabase = get_supabase_for_user(token) if token else get_supabase()
+    # Authenticated requests use the user token (RLS as that user).
+    # Unauthenticated requests use the admin client to bypass RLS;
+    # guest-visibility restrictions are then enforced in the API layer.
+    if token:
+        supabase = get_supabase_for_user(token)
+    else:
+        from app.core.supabase import get_supabase_admin
+        supabase = get_supabase_admin()
 
     response = (
         supabase.table("event")

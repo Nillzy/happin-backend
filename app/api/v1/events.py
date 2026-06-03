@@ -7,7 +7,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_current_user_optional
 from app.schemas.events import (
     EventCreate, EventUpdate, EventListItem, EventListResponse,
     EventDetailResponse, RsvpRequest, RsvpResponse, RefundSummary,
@@ -42,6 +42,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _bearer = HTTPBearer()
+_optional_bearer = HTTPBearer(auto_error=False)
 
 
 def _me_token(credentials=Depends(_bearer)) -> str:
@@ -105,16 +106,19 @@ async def list_public_events(
     city: Optional[str] = Query(default=None),
     is_free: Optional[bool] = Query(default=None),
     search: Optional[str] = Query(default=None),
-    user=Depends(get_current_user),
-    token: str = Depends(_me_token),
+    user=Depends(get_current_user_optional),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
 ):
     """List public events with optional filtering and pagination."""
-    person = person_service.get_or_create_person(
-        supabase_user_id=user.user.id,
-        email=user.user.email,
-        token=token,
-    )
-    person_id = person["person_id"]
+    token = credentials.credentials if credentials else None
+    person_id = None
+    if user:
+        person = person_service.get_or_create_person(
+            supabase_user_id=user.user.id,
+            email=user.user.email,
+            token=token,
+        )
+        person_id = person["person_id"]
 
     raw_events, total_count = event_service.get_public_events(
         limit=limit,
@@ -253,16 +257,20 @@ def _to_detail(raw: dict) -> EventDetailResponse:
 @router.get("/{event_id}", response_model=EventDetailResponse)
 async def get_event_detail(
     event_id: str,
-    user=Depends(get_current_user),
-    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    user=Depends(get_current_user_optional),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
 ):
-    supabase_user_id = user.user.id
-    token = credentials.credentials
+    supabase_user_id = user.user.id if user else None
+    token = credentials.credentials if credentials else None
     raw = event_service.get_event_by_id(event_id, supabase_user_id, token)
     if not raw:
         raise HTTPException(status_code=404, detail="Event not found")
 
     if raw.get("status") == "draft" and not raw.get("is_host"):
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    # Unauthentifizierte Gäste dürfen nur öffentliche Events sehen
+    if not supabase_user_id and not raw.get("is_public"):
         raise HTTPException(status_code=404, detail="Event not found")
 
     return _to_detail(raw)
