@@ -8,6 +8,8 @@
 
 Die `EventInfo`-Komponente stellt detaillierte Informationen zu einzelnen Events bereit. Sie wird vom `APIAdapter` über die `EventInfoAPI`-Schnittstelle aufgerufen und liefert Event-Details an das Frontend.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Validierung%2C%20Account%2DErstellung)-,EventInfo,-M4%20(Eindeutige%2C%20nicht>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Endpunkt | Beschreibung |

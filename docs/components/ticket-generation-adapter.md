@@ -10,6 +10,8 @@ Der `TicketGenerationAdapter` ist verantwortlich für die Erzeugung von CSV- und
 
 Diese Komponente wurde im Entwurf explizit als T-Software eingestuft, da sie auf generische Python-Bibliotheken zurückgreift.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=6%20h%20aktualisieren)-,TicketGenerationAdapter,-M8%20(Ticket%20als>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Genutzt von | Beschreibung |

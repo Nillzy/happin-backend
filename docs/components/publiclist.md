@@ -8,6 +8,8 @@
 
 Die `PublicList`-Komponente stellt die gefilterte, paginierte öffentliche Event-Liste bereit. Sie entspricht dem Workflow M11 (öffentliche Eventliste) aus dem Pflichtenheft und ist die am häufigsten aufgerufene Komponente.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Host%2DEinladung%20versenden)-,PublicList,-M11%20(%C3%96ffentliche%20Events>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Endpunkt | Beschreibung |

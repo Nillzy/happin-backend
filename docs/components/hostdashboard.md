@@ -8,6 +8,8 @@
 
 Die `HostDashboard`-Komponente stellt alle Host-spezifischen Ansichten und Verwaltungsfunktionen bereit. Ein Host kann seine eigenen Events einsehen, die Teilnehmerliste verwalten, RSVP-Antworten prüfen und Tickets scannen.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=meistgew%C3%A4hltes%20Datum%20setzen)-,HostDashboard,-M7%20(Teilnehmer%C3%BCbersicht%3A%20Zusagen>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Endpunkt | Beschreibung |

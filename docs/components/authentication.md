@@ -8,6 +8,8 @@
 
 Die `Authentication`-Komponente ist verantwortlich für die Verwaltung von Benutzerkonten und die Absicherung aller geschützten Endpunkte. Sie stellt dem `APIAdapter` die Schnittstellen `Register`, `Login`, `Logout` und `Delete` zur Verfügung.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Umgesetzte%20Anforderungen-,Authentication,-M1%20(Passwortlose%20Authentifizierung>)
+
 !!! note "Abweichung vom Entwurf"
     Im ursprünglichen Entwurf sollte bei der Registrierung eine **Handynummer per SMS** bestätigt werden (M1). In der Implementierung wird **E-Mail-OTP über Supabase Auth** eingesetzt. Supabase übernimmt die gesamte Authentifizierungslogik (Registrierung, OTP-Versand, Session-Verwaltung). Das Backend validiert eingehende JWTs, ohne selbst Passwörter oder Sessions zu speichern.
 
