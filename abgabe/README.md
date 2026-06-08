@@ -2,14 +2,17 @@
 
 Lauffaehige Container-Abgabe des Happin-Projekts (Backend + Frontend).
 
-## Inhalt
+## Inhalt des Bundles
+
+Diese Datei (`happin-abgabe-<version>.tar.gz`) enthaelt nach dem Entpacken einen Ordner mit:
 
 | Datei | Zweck |
 |---|---|
-| `happin-images.tar.gz` | Beide Docker-Images (Backend + Frontend) als Tarball |
 | `docker-compose.yml` | Orchestriert beide Container |
 | `backend.env` | Konfiguration Backend (Supabase, Stripe-Test-Mode, etc.) |
 | `frontend.env` | Konfiguration Frontend |
+| `happin-images.tar.gz` | Beide Docker-Images (Backend + Frontend) |
+| `README.md` | Diese Anleitung |
 
 ## Voraussetzungen
 
@@ -19,17 +22,21 @@ Lauffaehige Container-Abgabe des Happin-Projekts (Backend + Frontend).
 ## Start
 
 ```bash
-# 1. Tarball aus dem GitLab Release herunterladen
+# 1. Bundle aus dem GitLab Release herunterladen
 #    Release-Seite: https://gitlab.com/dhbw-se/se-tinf24b2/happin/backend/-/releases
-#    Asset: "happin-images.tar.gz"
+#    Asset: "happin-abgabe-<version>.tar.gz"
 
-# 2. Images in Dockers internen Speicher laden
+# 2. Bundle entpacken und in den Ordner wechseln
+tar -xzf happin-abgabe-*.tar.gz
+cd happin-abgabe-*
+
+# 3. Images in Dockers internen Speicher laden
 docker load -i happin-images.tar.gz
 
-# 3. Container starten
+# 4. Container starten
 docker compose up -d
 
-# 4. Status pruefen
+# 5. Status pruefen
 docker compose ps
 ```
 
