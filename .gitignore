@@ -30,3 +30,7 @@ Thumbs.db
 
 # MkDocs build output
 site/
+
+# Abgabe-Artefakte (werden bei Bedarf lokal mit abgabe/export-images.sh erzeugt)
+abgabe/*.tar.gz
+abgabe/*.tar
