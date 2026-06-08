@@ -10,6 +10,8 @@ Der `PaymentAdapter` kapselt die Kommunikation mit dem externen Zahlungsdienst *
 
 Stripe Connect ermöglicht es, dass Ticket-Einnahmen direkt auf das Stripe-Konto des Event-Hosts ausgezahlt werden, ohne dass Happin als Zwischenhändler fungiert.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=alle%20Anwendungskern%2DKomponenten)-,PaymentAdapter,-S2%20(Stripe%2DAnbindung>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Genutzt von | Beschreibung |

@@ -8,6 +8,8 @@
 
 Der `WeatherAdapter` kapselt die Kommunikation mit dem externen Wetterdienst **WeatherAPI.com**. Er stellt dem Anwendungskern (konkret: `EventInfo`) die Schnittstelle `GetWeather` bereit, über die Wettervorhersagen für Event-Orte und -Zeitpunkte abgerufen werden.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Geodaten%20f%C3%BCr%20Kartensuche)-,WeatherAdapter,-S3%20(Wetterdaten%20abrufen>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Genutzt von | Beschreibung |

@@ -49,7 +49,6 @@ markdown_extensions:
 
 nav:
   - Startseite: index.md
-  - Architektur: architecture.md
   - Backend-Komponenten:
     - Überblick: components/index.md
     - API-Adapter: components/api-adapter.md
@@ -69,5 +68,5 @@ nav:
     - MapsAdapter: components/maps-adapter.md
     - WeatherAdapter: components/weather-adapter.md
     - TicketGenerationAdapter: components/ticket-generation-adapter.md
-  - API-Referenz:
-    - Endpunkte: api/endpoints.md
+  - API-Referenz: /api/docs
+  - Architekturentwurf: architecture.md

@@ -1,4 +1,4 @@
-# Architektur
+# Architekturentwurf
 
 ## Komponentendiagramm
 
@@ -14,7 +14,7 @@ Die Backend-Komponenten lassen sich in drei Schichten einteilen:
 
 ---
 
-## Entwurf vs. Implementierung
+## Umsetzung des Entwurfes
 
 ### APIAdapter
 
@@ -39,6 +39,8 @@ Die im Entwurf definierten Schnittstellen sind direkt als FastAPI-Endpunkte real
 
 *✅ vollständig umgesetzt*
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Umgesetzte%20Anforderungen-,Authentication,-M1%20(Passwortlose%20Authentifizierung>)
+
 Die `Authentication`-Komponente ist als `app/core/auth.py` umgesetzt. Die Schnittstellen `Register`, `Login`, `Logout` und `Delete` werden von Supabase Auth übernommen – das Backend validiert lediglich die JWT-Tokens. Registrierung und Login erfolgen clientseitig über Supabase; das Backend stellt `get_current_user()` als FastAPI-Dependency bereit.
 
 !!! note "Abweichung vom Entwurf"
@@ -47,6 +49,8 @@ Die `Authentication`-Komponente ist als `app/core/auth.py` umgesetzt. Die Schnit
 ### MessagingAdapter
 
 *✅ umgesetzt – E-Mail statt SMS*
+
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=nach%20Zahlung%20ausstellen)-,MessagingAdapter,-M1%20(OTP%2DVersand>)
 
 Der `MessagingAdapter` ist als `app/services/email_service.py` umgesetzt, der den Dienst **Resend** über dessen REST-API nutzt. 
 
@@ -59,19 +63,21 @@ Der `MessagingAdapter` ist als `app/services/email_service.py` umgesetzt, der de
 
 Der Anwendungskern besteht in der Implementierung aus dem `app/services/`-Verzeichnis. Jede Entwurfskomponente entspricht einem oder mehreren Service-Modulen:
 
-| Entwurfs-Komponente | Implementierung |
-|---|---|
-| `EventInfo` | `event_service.py` (Lesen) |
-| `EventAdmin` | `event_service.py` (Schreiben), `custom_field_service.py` |
-| `RSVP` | `booking_service.py`, `waitlist_service.py` |
-| `HostDashboard` | `user_service.py`, `person_service.py` |
-| `Notification` | `notification_service.py`, `reminder_service.py`, `expo_push_service.py` |
-| `PublicList` | `event_service.py` (gefilterte öffentliche Abfragen) |
-| `Ticketing` | `ticket_service.py`, `ticket_option_service.py`, `calendar_service.py`, `google_wallet_service.py` |
+| Entwurfs-Komponente | Implementierung | Im Architekturentwurf |
+|---|---|---|
+| `EventInfo` | `event_service.py` (Lesen) | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Validierung%2C%20Account%2DErstellung)-,EventInfo,-M4%20(Eindeutige%2C%20nicht>) |
+| `EventAdmin` | `event_service.py` (Schreiben), `custom_field_service.py` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=in%20Eventdaten%20liefern)-,EventAdmin,-M2%20(Event%20erstellen>) |
+| `RSVP` | `booking_service.py`, `waitlist_service.py` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Co%2DHosts%20persistieren)-,RSVP,-M5%20(RSVP%20speichern>) |
+| `HostDashboard` | `user_service.py`, `person_service.py` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=meistgew%C3%A4hltes%20Datum%20setzen)-,HostDashboard,-M7%20(Teilnehmer%C3%BCbersicht%3A%20Zusagen>) |
+| `Notification` | `notification_service.py`, `reminder_service.py`, `expo_push_service.py` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Host%2DRechte%20verwalten)-,Notification,-M3%20(Teilnehmer%20%C3%BCber>) |
+| `PublicList` | `event_service.py` (gefilterte öffentliche Abfragen) | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Host%2DEinladung%20versenden)-,PublicList,-M11%20(%C3%96ffentliche%20Events>) |
+| `Ticketing` | `ticket_service.py`, `ticket_option_service.py`, `calendar_service.py`, `google_wallet_service.py` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=S7%20(Kategoriefilterung)-,Ticketing,-M8%20(Digitale%20Tickets>) |
 
 ### DatabaseAdapter
 
 *✅ umgesetzt – Supabase statt generisch*
+
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Entfernung%2C%20Nachr%C3%BCcken%2C%20Erinnerungen)-,DatabaseAdapter,-M1%20(DBAuth%3A%20Nutzer>)
 
 Der `DatabaseAdapter` ist als `app/core/supabase.py` sowie der Supabase Python-Client realisiert. Die Schnittstellen `Auth` (DBAuth), `Read` und `Write` (DBData) werden durch den Supabase-Client bereitgestellt.
 
@@ -79,11 +85,15 @@ Der `DatabaseAdapter` ist als `app/core/supabase.py` sowie der Supabase Python-C
 
 *✅ umgesetzt*
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=alle%20Anwendungskern%2DKomponenten)-,PaymentAdapter,-S2%20(Stripe%2DAnbindung>)
+
 Der `PaymentAdapter` entspricht `app/adapters/stripe_payment.py` + `app/services/payment_service.py` + `app/services/stripe_webhook_service.py`. Externer Dienst ist **Stripe Connect**.
 
 ### MapsAdapter
 
 *✅ umgesetzt*
+
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Auszahlung%20an%20Host)-,MapsAdapter,-S1%20(Koordinaten%20aus>)
 
 Der `MapsAdapter` ist als `app/services/geocoding_service.py` umgesetzt und kommuniziert mit **MapTiler**.
 
@@ -91,11 +101,15 @@ Der `MapsAdapter` ist als `app/services/geocoding_service.py` umgesetzt und komm
 
 *✅ umgesetzt*
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Geodaten%20f%C3%BCr%20Kartensuche)-,WeatherAdapter,-S3%20(Wetterdaten%20abrufen>)
+
 Der `WeatherAdapter` entspricht `app/adapters/weatherapi.py` + `app/services/weather_service.py`. Externer Dienst ist **WeatherAPI.com**.
 
 ### TicketGenerationAdapter
 
 *✅ umgesetzt*
+
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=6%20h%20aktualisieren)-,TicketGenerationAdapter,-M8%20(Ticket%20als>)
 
 Der `TicketGenerationAdapter` ist als `app/services/export/` umgesetzt mit:
 
