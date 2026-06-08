@@ -30,6 +30,8 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 | [21-erinnerungen-k4.md](21-erinnerungen-k4.md) | Erinnerungen (K4): Tabellen, REST-Endpoints, APScheduler + pywebpush, VAPID-Setup |
 | [22-rsvp-export.md](22-rsvp-export.md) | Gästelisten-Export (S8): CSV + PDF, Host-only, Filter accepted, eine Zeile pro Ticket |
 | [23-weather-forecast.md](23-weather-forecast.md) | Wettervorhersage (S3): WeatherAPI.com-Integration, Host-Toggle, Graceful Degradation, On-Demand-Fetch |
+| [24-documentation-concept.md](24-documentation-concept.md) | Dokumentationskonzept: Drei Dokus (`repo-docs/`, `docs/` via MkDocs unter `/docs`, Swagger unter `/api/docs`), Zielgruppen, Konventionen |
+| [25-traceability.md](25-traceability.md) | Traceability-Konzept: Rückreferenzen Code → Architekturentwurf → Pflichtenheft → Lastenheft, Mx/Sx/Kx-IDs, URL-Fragment-Anchor-Pattern |
 
 ## Neue Dokumentation hinzufügen
 

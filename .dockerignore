@@ -55,7 +55,7 @@ Thumbs.db
 # Documentation (not needed in the image)
 README.md
 docs/
-documentation/
+repo-docs/
 
 # CI/CD
 .gitlab-ci.yml
