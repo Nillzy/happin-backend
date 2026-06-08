@@ -97,6 +97,9 @@ def get_public_events(
         )
 
     # Count query (same filters as paginated query, excluding pagination-only args)
+    # ilike/filter with % sends raw % in the URL which triggers a Cloudflare Worker
+    # exception (1101) on Supabase. or_() URL-encodes % as %25 and avoids this.
+    search_term = search.strip() if search else None
     count_q = (
         supabase.table("event")
         .select("event_id", count="exact")
@@ -111,9 +114,8 @@ def get_public_events(
         count_q = count_q.eq("is_free", True)
         if paid_event_ids_filter:
             count_q = count_q.not_.in_("event_id", paid_event_ids_filter)
-    if search:
-        search_pattern = f"%{search.strip()}%"
-        count_q = count_q.ilike("title", search_pattern)
+    if search_term:
+        count_q = count_q.or_(f"title.ilike.%{search_term}%")
     count_response = count_q.execute()
     total_count = count_response.count if hasattr(count_response, "count") else 0
 
@@ -136,9 +138,8 @@ def get_public_events(
         q = q.eq("is_free", True)
         if paid_event_ids_filter:
             q = q.not_.in_("event_id", paid_event_ids_filter)
-    if search:
-        search_pattern = f"%{search.strip()}%"
-        q = q.ilike("title", search_pattern)
+    if search_term:
+        q = q.or_(f"title.ilike.%{search_term}%")
     q = q.order("starts_at", desc=False).range(offset, offset + limit - 1)
     response = q.execute()
 
