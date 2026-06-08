@@ -10,6 +10,8 @@ Der `DatabaseAdapter` kapselt alle Datenbankzugriffe und schützt den Anwendungs
 
 Als konkreter Datenbankdienst wird **Supabase** eingesetzt, das eine gehostete PostgreSQL-Datenbank mit integrierter Auth, Row-Level Security (RLS) und REST-API bereitstellt.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Entfernung%2C%20Nachr%C3%BCcken%2C%20Erinnerungen)-,DatabaseAdapter,-M1%20(DBAuth%3A%20Nutzer>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Genutzt von | Beschreibung |

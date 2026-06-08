@@ -8,6 +8,8 @@
 
 Die `Notification`-Komponente verwaltet alle Benachrichtigungen an Nutzer. Sie unterscheidet zwischen **In-App-Benachrichtigungen** (sichtbar in der App) und **Push-Benachrichtigungen** (native Push / Web Push für Erinnerungen).
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Host%2DRechte%20verwalten)-,Notification,-M3%20(Teilnehmer%20%C3%BCber>)
+
 !!! note "Erweiterung gegenüber dem Entwurf"
     Die vollständige Push-Benachrichtigungsinfrastruktur (VAPID Web Push, Expo Push API, APScheduler) ist eine Erweiterung, die im ursprünglichen Architekturentwurf nicht explizit vorgesehen war.
 

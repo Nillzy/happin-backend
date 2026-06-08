@@ -8,6 +8,8 @@
 
 Der `MessagingAdapter` kapselt die Kommunikation mit einem externen Nachrichtendienst. Er stellt der `Authentication`-Komponente die Schnittstelle `SendMessage` bereit, über die Nachrichten an Nutzer versendet werden.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=nach%20Zahlung%20ausstellen)-,MessagingAdapter,-M1%20(OTP%2DVersand>)
+
 !!! note "Abweichung vom Entwurf"
     Im ursprünglichen Entwurf war der `MessagingAdapter` für den Versand von **SMS** (Handynummer-Verifikation bei Registrierung, M1) vorgesehen. In der Implementierung wird er für den Versand von **E-Mails** über **Resend** eingesetzt. Die Authentifizierungs-OTPs werden direkt von Supabase Auth per E-Mail versendet; der `MessagingAdapter` wird für transaktionale E-Mails außerhalb des Auth-Flows verwendet.
 

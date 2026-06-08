@@ -8,6 +8,8 @@
 
 Die `RSVP`-Komponente verwaltet die Anmeldung von Nutzern zu Events. Sie unterscheidet zwischen kostenfreien RSVP-Zusagen und kostenpflichtigen Ticketbuchungen und steuert Wartelisten für ausgebuchte Events.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Co%2DHosts%20persistieren)-,RSVP,-M5%20(RSVP%20speichern>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Endpunkt | Beschreibung |

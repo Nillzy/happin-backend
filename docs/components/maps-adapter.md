@@ -10,6 +10,8 @@ Der `MapsAdapter` kapselt die Kommunikation mit dem externen Kartendienst **MapT
 
 Koordinaten werden beim Erstellen eines Events benötigt, damit der Ort auf der Karte angezeigt werden kann.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Auszahlung%20an%20Host)-,MapsAdapter,-S1%20(Koordinaten%20aus>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Genutzt von | Beschreibung |

@@ -52,6 +52,6 @@ happin-backend/
 
 ## Weiterführende Abschnitte
 
-- [Architektur](architecture.md) – Komponentendiagramm und Entwurfsvergleich
+- [Architekturentwurf](architecture.md) – Komponentendiagramm und Entwurfsvergleich
 - [Komponenten](components/index.md) – Jede Komponente auf einer eigenen Seite
-- [API-Endpunkte](api/endpoints.md) – Vollständige Endpunkt-Referenz
+- [API-Referenz](/api/docs) – Interaktive Swagger-UI mit allen Endpunkten

@@ -8,6 +8,8 @@
 
 Die `EventAdmin`-Komponente stellt alle Funktionen zur Verwaltung von Events bereit: Erstellen, Bearbeiten, Absagen sowie die Verwaltung benutzerdefinierter Felder (Custom Fields) für Anmeldeformulare.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=in%20Eventdaten%20liefern)-,EventAdmin,-M2%20(Event%20erstellen>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Endpunkt | Beschreibung |

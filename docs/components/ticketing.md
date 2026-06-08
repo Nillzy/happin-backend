@@ -8,6 +8,8 @@
 
 Die `Ticketing`-Komponente ist verantwortlich für den gesamten Ticketlebenszyklus: Erstellung, Ausgabe, Validierung beim Einlass und Export. Sie wird bei Buchungen aufgerufen und stellt Tickets in verschiedenen Formaten bereit.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=S7%20(Kategoriefilterung)-,Ticketing,-M8%20(Digitale%20Tickets>)
+
 ## Bereitgestellte Schnittstellen
 
 | Schnittstelle | Endpunkt | Beschreibung |
