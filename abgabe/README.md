@@ -1,10 +1,10 @@
 # Happin — Docker-Abgabe
 
-Lauffaehige Container-Abgabe des Happin-Projekts (Backend + Frontend).
+Hier liegt alles, was man braucht, um Happin lokal als Docker-Setup zu starten — Backend und Frontend in zwei Containern, fertig konfiguriert.
 
 ## Inhalt des Bundles
 
-Diese Datei (`happin-abgabe-<version>.tar.gz`) enthaelt nach dem Entpacken einen Ordner mit:
+Diese Datei (`happin-abgabe-<version>.tar.gz`) enthält nach dem Entpacken einen Ordner mit:
 
 | Datei | Zweck |
 |---|---|
@@ -16,41 +16,31 @@ Diese Datei (`happin-abgabe-<version>.tar.gz`) enthaelt nach dem Entpacken einen
 
 ## Voraussetzungen
 
-- Docker Deamon
+- Docker Daemon (z. B. Docker Desktop, Colima, ...)
 - Ports: **8001** (Backend) und **8080** (Frontend)
 
 ## Start
 
- 1. Images aus dem GitLab Release herunterladen
-    Release-Seite: https://gitlab.com/dhbw-se/se-tinf24b2/happin/backend/-/releases
+1. **Images herunterladen** von der [Release-Seite](https://gitlab.com/dhbw-se/se-tinf24b2/happin/backend/-/releases).
 
 ```bash
-# 2. Bundle entpacken und in den Ordner wechseln
+# Bundle entpacken und in den Ordner wechseln
 tar -xzf happin-abgabe-*.tar.gz
 cd happin-abgabe-*
 
-# 3. Images in Dockers internen Speicher laden
+# Images in Dockers internen Speicher laden
 docker load -i happin-images.tar.gz
 
-# 4. Container starten
+# Container starten
 docker compose up -d
 
-# 5. Status pruefen
+# Status prüfen
 docker compose ps
 ```
 
 ## Aufrufen
 
 - **Frontend (Web):** http://localhost:8080
-- **Backend Health-Check:** http://localhost:8001/health
-- **Backend API-Docs (Swagger):** http://localhost:8001/docs
-
-## Logs ansehen
-
-```bash
-docker compose logs -f backend
-docker compose logs -f frontend
-```
 
 ## Stoppen
 
@@ -61,5 +51,5 @@ docker compose down
 ## Hinweise
 
 - Die `.env`-Dateien enthalten **Test-Credentials** (Stripe Test-Mode, Test-Supabase-Instanz). Keine echten Zahlungen, keine Produktivdaten.
-- Das Frontend-Image hat seine API-URL zur Build-Zeit ins Bundle kompiliert. Wenn das Frontend kein Backend findet, ist das vermutlich der Grund — Backend-Health-Check unter `/health` zeigt, ob das Backend selbst laeuft.
-- Google-Wallet-Integration ist im Abgabe-Setup deaktiviert (Service-Account-Datei nicht enthalten).
+- Das Frontend-Image hat seine API-URL zur Build-Zeit ins Bundle kompiliert. Wenn das Frontend kein Backend findet, ist das vermutlich der Grund — Backend-Health-Check unter `http://localhost:8001/health` zeigt, ob das Backend selbst läuft.
+- **Google Wallet ist im Abgabe-Setup deaktiviert.** Die Integration benötigt zur Laufzeit eine private Google-Service-Account-JSON-Datei, die wir nicht ins öffentlich zugängliche Bundle legen. Das Backend startet ohne diese Datei normal — nur die "Zum Google Wallet hinzufügen"-Funktion ist nicht aktiv.
