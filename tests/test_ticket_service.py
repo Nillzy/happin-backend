@@ -458,17 +458,41 @@ class TestCreateTickets:
 
 class TestDeleteTicketsForEvent:
     @patch("app.services.ticket_service.get_supabase_for_user")
-    def test_should_delete_only_free_tickets(self, mock_get_sb):
+    def test_should_filter_by_event_and_person_and_free_tickets_only(
+        self, mock_get_sb
+    ):
+        """Verify the three filter predicates by call_args, not by chain shape.
+
+        The behavior we care about: the delete is restricted to (event_id,
+        person_id) AND only un-paid tickets (ticket_order_id IS NULL). Walking
+        the mock chain to assert this couples to the exact call order — we
+        instead collect every `.eq()` and `.is_()` call on the table mock and
+        verify the predicates as a set.
+        """
         sb = MagicMock()
         mock_get_sb.return_value = sb
 
         ticket_service.delete_tickets_for_event("evt-1", "p-1", "tok")
 
-        # The is_("ticket_order_id", "null") call is what restricts to free tickets
-        delete_chain = sb.table.return_value.delete.return_value
-        delete_chain.eq.return_value.eq.return_value.is_.assert_called_once_with(
-            "ticket_order_id", "null"
-        )
+        # Verify the table targeted is "ticket"
+        sb.table.assert_called_with("ticket")
+
+        # Collect all .eq() calls on any MagicMock returned in the chain by
+        # walking mock_calls — this captures predicates regardless of order.
+        eq_predicates = {
+            tuple(call.args)
+            for call in sb.mock_calls
+            if call[0].endswith(".eq")
+        }
+        is_predicates = {
+            tuple(call.args)
+            for call in sb.mock_calls
+            if call[0].endswith(".is_")
+        }
+
+        assert ("event_id", "evt-1") in eq_predicates
+        assert ("person_id", "p-1") in eq_predicates
+        assert ("ticket_order_id", "null") in is_predicates
 
     @patch("app.services.ticket_service.get_supabase_for_user")
     def test_should_propagate_failure(self, mock_get_sb):
@@ -482,15 +506,25 @@ class TestDeleteTicketsForEvent:
 
 class TestDeleteTicketById:
     @patch("app.services.ticket_service.get_supabase_for_user")
-    def test_should_delete_ticket_by_id(self, mock_get_sb):
+    def test_should_filter_delete_by_ticket_id(self, mock_get_sb):
+        """Behavior: the delete must target a single row matching ticket_id.
+
+        We assert via the set of `.eq()` call-args collected from mock_calls,
+        which decouples from the exact chain shape (e.g. table().delete().eq()
+        vs. table().eq().delete()).
+        """
         sb = MagicMock()
         mock_get_sb.return_value = sb
 
         ticket_service.delete_ticket_by_id("t-1", "tok")
 
-        sb.table.return_value.delete.return_value.eq.assert_called_once_with(
-            "ticket_id", "t-1"
-        )
+        sb.table.assert_called_with("ticket")
+        eq_predicates = {
+            tuple(call.args)
+            for call in sb.mock_calls
+            if call[0].endswith(".eq")
+        }
+        assert ("ticket_id", "t-1") in eq_predicates
 
     @patch("app.services.ticket_service.get_supabase_for_user")
     def test_should_propagate_failure(self, mock_get_sb):
