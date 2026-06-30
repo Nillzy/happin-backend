@@ -88,16 +88,59 @@ backend/
 │   ├── core/
 │   │   ├── config.py           # Pydantic Settings — lädt alle Env-Variablen typsicher
 │   │   ├── supabase.py         # Globaler Supabase-Client (lazy initialisiert)
-│   │   └── auth.py             # FastAPI-Dependencies: get_current_user / get_current_user_optional
+│   │   ├── auth.py             # FastAPI-Dependencies: get_current_user / get_current_user_optional
+│   │   └── ticket_token.py     # JWT-Hilfsfunktionen für Ticket-Token
 │   ├── api/
 │   │   └── v1/
-│   │       ├── router.py       # Aggregiert alle v1-Sub-Router
-│   │       ├── user.py         # /api/v1/user/* Endpoints
-│   │       └── events.py       # /api/v1/events/* Endpoints
-│   ├── schemas/
-│   │   ├── user.py             # UserResponse (Pydantic)
-│   │   └── event.py            # EventCreate, EventDetailResponse, EventListResponse
+│   │       ├── router.py           # Aggregiert alle v1-Sub-Router
+│   │       ├── user.py             # /api/v1/user/* Endpoints
+│   │       ├── users.py            # /api/v1/users/* Endpoints
+│   │       ├── events.py           # /api/v1/events/* Endpoints
+│   │       ├── ticket_options.py   # /api/v1/events/{id}/ticket-options Endpoints
+│   │       ├── tickets.py          # /api/v1/tickets/* Endpoints
+│   │       ├── payments.py         # /api/v1/payments/* Endpoints (Stripe)
+│   │       ├── custom_fields.py    # /api/v1/events/{id}/custom-fields Endpoints
+│   │       ├── images.py           # /api/v1/images/* Endpoints
+│   │       ├── reminders.py        # /api/v1/reminders/* Endpoints
+│   │       └── notifications.py    # /api/v1/notifications/* Endpoints
+│   ├── adapters/
+│   │   ├── stripe_payment.py   # Stripe-API-Adapter
+│   │   └── weatherapi.py       # WeatherAPI-Adapter
+│   ├── schemas/                # Pydantic Request-/Response-Modelle
+│   │   ├── user.py
+│   │   ├── events.py
+│   │   ├── ticket_options.py
+│   │   ├── tickets.py
+│   │   ├── payments.py
+│   │   ├── custom_fields.py
+│   │   ├── participants.py
+│   │   ├── notification.py
+│   │   ├── reminder.py
+│   │   └── waitlist.py
 │   ├── services/               # Business-Logik und DB-Zugriffe
+│   │   ├── event_service.py
+│   │   ├── booking_service.py
+│   │   ├── ticket_service.py
+│   │   ├── ticket_option_service.py
+│   │   ├── payment_service.py
+│   │   ├── stripe_webhook_service.py
+│   │   ├── custom_field_service.py
+│   │   ├── user_service.py
+│   │   ├── person_service.py
+│   │   ├── notification_service.py
+│   │   ├── reminder_service.py
+│   │   ├── reminder_scheduler.py
+│   │   ├── waitlist_service.py
+│   │   ├── calendar_service.py
+│   │   ├── email_service.py
+│   │   ├── expo_push_service.py
+│   │   ├── geocoding_service.py
+│   │   ├── google_wallet_service.py
+│   │   ├── weather_service.py
+│   │   └── export/
+│   │       ├── export_service.py
+│   │       ├── csv_renderer.py
+│   │       └── pdf_renderer.py
 │   └── utils/                  # Hilfsfunktionen (pure functions, formatter, validator)
 │
 ├── supabase/
@@ -106,15 +149,46 @@ backend/
 │
 ├── tests/
 │   ├── conftest.py             # Pytest-Fixtures; mockt Supabase vor App-Import
-│   ├── test_health.py          # Tests für /, /health, /api/v1/health
-│   └── test_auth.py            # Tests für /api/v1/user/me Auth-Flow
+│   ├── test_health.py
+│   ├── test_auth.py
+│   ├── test_events.py
+│   ├── test_events_cancel.py
+│   ├── test_events_cancelled_locks.py
+│   ├── test_events_filter.py
+│   ├── test_booking_service.py
+│   ├── test_ticket_service.py
+│   ├── test_ticket_option_service.py
+│   ├── test_payments.py
+│   ├── test_stripe_webhook_service.py
+│   ├── test_custom_field_service.py
+│   ├── test_participants.py
+│   ├── test_rsvp.py
+│   ├── test_waitlist.py
+│   ├── test_calendar.py
+│   ├── test_export.py
+│   ├── test_google_wallet.py
+│   ├── test_notification_service.py
+│   ├── test_notifications_api.py
+│   ├── test_person_service.py
+│   ├── test_user_service.py
+│   ├── test_email_service.py
+│   ├── test_devices_list_delete.py
+│   └── test_push_token_ownership_transfer.py
 │
-├── documentation/              # Ausführliche Maintainer-Doku (Markdown)
+├── scripts/
+│   ├── start_dev.sh            # Entwicklungsserver starten (baut Doku wenn DEBUG=true)
+│   └── generate_vapid_keys.py  # VAPID-Keys für Web-Push generieren
+│
+├── docs/                       # MkDocs-Quelldateien (Komponentendokumentation)
+├── repo-docs/                  # Ausführliche Maintainer-Doku (Markdown)
+├── abgabe/                     # Abgabe-Artefakte (Docker Compose, Env-Vorlagen)
+├── static/                     # Statische Assets (z. B. Logo)
 ├── .env.example                # Vorlage für Umgebungsvariablen (ohne Secrets)
 ├── requirements.txt            # Python-Abhängigkeiten (pinned)
 ├── Dockerfile                  # Multi-Stage Build (Builder + Production)
 ├── .dockerignore
 ├── .gitlab-ci.yml              # Pipeline: test → build → deploy (manuell)
+├── mkdocs.yml                  # MkDocs-Konfiguration
 └── README.md
 ```
 
@@ -338,7 +412,7 @@ Migration-Dateien liegen unter `supabase/migrations/` und werden im Git versioni
 
 ## Weiterführende Dokumentation
 
-Ausführliche technische und organisatorische Dokumentation liegt unter `documentation/` (Einstieg: `documentation/00-index.md`).
+Ausführliche technische und organisatorische Dokumentation liegt unter `repo-docs/` (Einstieg: `repo-docs/00-index.md`).
 
 **Neue Themen, die in keine bestehende Datei passen, erhalten eine eigene Datei und einen Eintrag in `00-index.md`.**
 

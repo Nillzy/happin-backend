@@ -35,7 +35,7 @@ Diese Datei ist der **Einstiegspunkt** für Maintainer-Dokumentation. Sie ist **
 
 ## Neue Dokumentation hinzufügen
 
-1. Neue Datei unter `documentation/` anlegen, mit nummeriertem Präfix (z. B. `08-…`).
+1. Neue Datei unter `repo-docs/` anlegen, mit nummeriertem Präfix (z. B. `08-…`).
 2. In dieser Tabelle eine Zeile mit Kurzbeschreibung und relativem Link ergänzen.
 
 So bleibt die Sammlung **auffindbar** und die empfohlene Lesereihenfolge erkennbar.
