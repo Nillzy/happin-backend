@@ -1,4 +1,5 @@
 site_name: Happin Backend
+site_url: https://dhbw-se.gitlab.io/se-tinf24b2/happin/backend
 site_description: Dokumentation des Happin-Backends – FastAPI-basierte REST-API für die Happin-Eventplattform
 site_author: Happin-Team
 docs_dir: docs

@@ -2,6 +2,7 @@ stages:
   - test
   - build
   - deploy
+  - pages
 
 variables:
   DOCKER_DRIVER: overlay2
@@ -54,3 +55,21 @@ deploy:
   environment:
     name: production
     url: http://vm552.ipp-vps.net:8001
+
+pages:
+  stage: pages
+  image: python:3.11-slim
+
+  before_script:
+    - pip install -r docs-requirements.txt
+
+  script:
+    - mkdocs build
+    - mv site public
+
+  artifacts:
+    paths:
+      - public
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
