@@ -35,6 +35,9 @@ Thumbs.db
 # MkDocs build output
 site/
 
+# Generiertes OpenAPI-Schema (wird zur Build-Zeit von scripts/export_openapi.py erzeugt)
+docs/api/openapi.json
+
 # Abgabe-Artefakte (werden bei Bedarf lokal mit abgabe/export-images.sh erzeugt)
 abgabe/*.tar.gz
 abgabe/*.tar

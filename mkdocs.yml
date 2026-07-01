@@ -69,5 +69,5 @@ nav:
     - MapsAdapter: components/maps-adapter.md
     - WeatherAdapter: components/weather-adapter.md
     - TicketGenerationAdapter: components/ticket-generation-adapter.md
-  - API-Referenz: /api/docs
+  - API-Referenz: api/index.html
   - Architekturentwurf: architecture.md

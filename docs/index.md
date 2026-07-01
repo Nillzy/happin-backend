@@ -54,4 +54,4 @@ happin-backend/
 
 - [Architekturentwurf](architecture.md) – Komponentendiagramm und Entwurfsvergleich
 - [Komponenten](components/index.md) – Jede Komponente auf einer eigenen Seite
-- [API-Referenz](/api/docs) – Interaktive Swagger-UI mit allen Endpunkten
+- [API-Referenz](api/index.html) – Interaktive Swagger-UI mit allen Endpunkten

@@ -61,9 +61,10 @@ pages:
   image: python:3.11-slim
 
   before_script:
-    - pip install -r docs-requirements.txt
+    - pip install -r requirements.txt -r docs-requirements.txt
 
   script:
+    - python scripts/export_openapi.py
     - mkdocs build
     - mv site public
 
